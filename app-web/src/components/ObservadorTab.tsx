@@ -87,8 +87,11 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
 
   const main = (
     <>
-      <Panel style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: '200px' }}>
+      {/* Cronómetro centrado, como en Control; movimientos y pares a la
+          derecha. La columna izquierda vacía equilibra la rejilla. */}
+      <Panel className="cronometro-observador" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '24px' }}>
+        <div aria-hidden="true" />
+        <div style={{ textAlign: 'center' }}>
           <div style={sectionLabel}>
             {snapshot ? snapshot.status : 'sin datos de Control'}{snapshot?.intento ? ` · intento ${snapshot.intento}` : ''}
           </div>
@@ -96,7 +99,7 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
             {snapshot?.elapsed ?? '0:00'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '24px' }}>
+        <div style={{ display: 'flex', gap: '24px', justifyContent: 'flex-end' }}>
           <div>
             <div style={sectionLabel}>Movimientos</div>
             <div style={{ fontSize: '22px', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{snapshot?.moveCount ?? 0}</div>
@@ -156,23 +159,6 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
         )}
       </Panel>
 
-      {/* Espejo del grafo de Control: el observador sigue el recorrido real
-          sobre el mapa del juego, con el mismo componente y el mismo
-          comportamiento que las demás vistas (solo lectura). */}
-      <Panel>
-        <SectionTitle right={
-          <BotonInformeNivel onClick={() => setInformeNivel(true)} pares={pares} intentos={intentosControl.length} />
-        }>
-          Grafo de estados · {pares} par{pares > 1 ? 'es' : ''} — recorrido de Control
-        </SectionTitle>
-        <GrafoEstados
-          pares={pares}
-          previos={recorridosPrevios}
-          actual={snapshot?.recorrido ?? SIN_RECORRIDO}
-          height={400}
-          terminado={!!snapshot && snapshot.status.startsWith('victoria')} />
-      </Panel>
-
       <Panel>
         <SectionTitle>Registrar observación</SectionTitle>
         <textarea
@@ -202,6 +188,23 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
           Cada registro guarda el intento, el estado de la sesión y el momento del cronómetro de Control,
           y queda también en el informe general de la sesión.
         </div>
+      </Panel>
+
+      {/* Espejo del grafo de Control: el observador sigue el recorrido real
+          sobre el mapa del juego, con el mismo componente y el mismo
+          comportamiento que las demás vistas (solo lectura). */}
+      <Panel>
+        <SectionTitle right={
+          <BotonInformeNivel onClick={() => setInformeNivel(true)} pares={pares} intentos={intentosControl.length} />
+        }>
+          Grafo de estados · {pares} par{pares > 1 ? 'es' : ''} — recorrido de Control
+        </SectionTitle>
+        <GrafoEstados
+          pares={pares}
+          previos={recorridosPrevios}
+          actual={snapshot?.recorrido ?? SIN_RECORRIDO}
+          height={400}
+          terminado={!!snapshot && snapshot.status.startsWith('victoria')} />
       </Panel>
 
       <Collapsible title="Histórico — bitácora de observación" open={logOpen} onToggle={() => setLogOpen(o => !o)}>

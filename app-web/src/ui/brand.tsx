@@ -349,6 +349,6 @@ export function TwoColumn({ main, side }: { main: ReactNode; side: ReactNode }) 
 }
 
 // Panel con el estilo base — atajo para no repetir `{...panel, ...}`.
-export function Panel({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ ...panel, ...style }}>{children}</div>
+export function Panel({ children, style, className }: { children: ReactNode; style?: React.CSSProperties; className?: string }) {
+  return <div className={className} style={{ ...panel, ...style }}>{children}</div>
 }

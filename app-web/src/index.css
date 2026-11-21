@@ -125,7 +125,10 @@ body {
 .sim-bench__left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .sim-bench__right { min-width: 0; height: 520px; }
 @media (min-width: 1100px) {
-  .sim-bench__cols { grid-template-columns: minmax(440px, 5fr) minmax(0, 6fr); }
+  /* El juego manda: 60 % para el tablero y 40 % para el grafo, que acompaña
+     (antes 5:6, el grafo se llevaba más de la mitad y la mirada se iba a un
+     lado de la pantalla; pedido del autor, 2026-11-21). */
+  .sim-bench__cols { grid-template-columns: minmax(520px, 3fr) minmax(380px, 2fr); }
   .sim-bench__right {
     position: sticky; top: 0;
     height: max(480px, calc(100dvh - var(--bench-offset, 250px)));
@@ -259,6 +262,10 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .barra-pestanas { flex: 0 0 100% !important; }
   /* Difuminado en los bordes: avisa que hay más pestañas a los lados. */
   .barra-pestanas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); }
+  /* Cronómetro del observador: en una columna, todo centrado. */
+  .cronometro-observador { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .cronometro-observador > div:first-child { display: none; }
+  .cronometro-observador > div:last-child { justify-content: center !important; }
   /* Tarjetas Pausar/Pensar/Actuar/Estado inicial: dos por fila. */
   .rejilla-ppa { grid-template-columns: repeat(2, 1fr) !important; }
   /* «Cómo usar esta vista» abierta: como máximo un tercio de la pantalla. */

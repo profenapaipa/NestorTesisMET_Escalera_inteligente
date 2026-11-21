@@ -17,6 +17,11 @@ export type Version = {
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.12.3', fecha: '2026-11-21', publica: true,
+    titulo: 'El juego al centro de la atención',
+    cambios: 'Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado.',
+  },
+  {
     version: '0.12.2', fecha: '2026-11-21', publica: true,
     titulo: 'Logo oficial en la pestaña del navegador',
     cambios: 'La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular.',
