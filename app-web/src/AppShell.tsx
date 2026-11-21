@@ -61,14 +61,17 @@ function Shell() {
           mayúsculas, la activa marcada con el medio escalón azul y un filo
           inferior — no botones redondeados de colores sueltos. */}
       <div style={{ flexShrink: 0, borderBottom: '1px solid var(--color-line)' }}>
-        <div className="barra-pestanas" style={{
+        {/* Las pestañas siguen siendo botones (la prueba de navegación los busca
+            por rol de botón); la activa se anuncia con aria-current, que es la
+            semántica de una navegación entre vistas. */}
+        <nav aria-label="Vistas de la aplicación" className="barra-pestanas" style={{
           display: 'flex', alignItems: 'stretch', gap: '4px', maxWidth: tab === 'tutorial' || tab === 'libre' ? WIDE_MAX : '1400px', margin: '0 auto',
           padding: '0 20px', boxSizing: 'border-box',
         }}>
           {TABS.map(t => {
             const active = t.id === tab
             return (
-              <button key={t.id} className="pestana" onClick={() => setTab(t.id)} style={{
+              <button key={t.id} className="pestana" aria-current={active ? 'page' : undefined} onClick={() => setTab(t.id)} style={{
                 display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 14px 10px',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 borderBottom: `2px solid ${active ? 'var(--color-blue)' : 'transparent'}`,
@@ -100,7 +103,7 @@ function Shell() {
               onCambiar={(nombre, rol) => { setInformeAbierto(false); cerrarSesion(); abrirSesion(nombre, operatorId, rol) }}
               onCreditos={() => setCreditos(true)} />
           </span>
-        </div>
+        </nav>
       </div>
 
       {/* Fase 2 de la guía: cómo usar la vista abierta (se puede cerrar). */}

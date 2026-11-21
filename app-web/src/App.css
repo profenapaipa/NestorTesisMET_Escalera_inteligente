@@ -54,10 +54,24 @@
    (2 pulsos largos + descanso), Pensar ~1.4s (3 repeticiones rápidas +
    descanso) — ambos se repiten solos mientras la señal siga activa
    (hasta el apagado automático). */
-.cube-pausar { animation: pausar-pulse 2.5s ease-in-out infinite; }
-.cube-pensar { animation: pensar-breathe 1.4s ease-in-out infinite; }
-.cube-actuar { animation: actuar-glow 0.8s ease-out forwards; }
+/* Con «reducir movimiento» en el sistema el cubo queda con un halo fijo del
+   color de su fase: la señal se sigue viendo, solo deja de latir. Las barras
+   de vibración se mueven únicamente si el sistema no pide reducir el
+   movimiento (guía «motion» de Modern Web Guidance: se agrega el movimiento
+   con no-preference, no se anula después con animation: none). */
+.cube-pausar {
+  box-shadow: 0 0 14px rgba(0, 191, 255, 0.75);
+  @media (prefers-reduced-motion: no-preference) { animation: pausar-pulse 2.5s ease-in-out infinite; }
+}
+.cube-pensar {
+  box-shadow: 0 0 14px rgba(255, 255, 80, 0.8);
+  @media (prefers-reduced-motion: no-preference) { animation: pensar-breathe 1.4s ease-in-out infinite; }
+}
+.cube-actuar {
+  box-shadow: 0 0 12px rgba(0, 255, 80, 0.6);
+  @media (prefers-reduced-motion: no-preference) { animation: actuar-glow 0.8s ease-out forwards; }
+}
 
-.vib-pausar { animation: vib-pausar 2.5s ease-in-out infinite; }
-.vib-pensar { animation: vib-pensar 1.4s ease-in-out infinite; }
-.vib-actuar { animation: vib-actuar 0.3s ease-in-out infinite; }
+.vib-pausar { @media (prefers-reduced-motion: no-preference) { animation: vib-pausar 2.5s ease-in-out infinite; } }
+.vib-pensar { @media (prefers-reduced-motion: no-preference) { animation: vib-pensar 1.4s ease-in-out infinite; } }
+.vib-actuar { @media (prefers-reduced-motion: no-preference) { animation: vib-actuar 0.3s ease-in-out infinite; } }

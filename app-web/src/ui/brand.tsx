@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import type { PPAPhase } from '../core/ppa/ppaColors'
 import { panel, sectionLabel, smallBtn } from './styles'
@@ -32,7 +32,8 @@ export function EegTrace({ color }: { color: string }) {
       <polyline
         points={EEG_TRACE} fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round"
         pathLength={100}
-        style={{ mixBlendMode: 'screen', animation: 'eeg-sweep 7s linear infinite' }}
+        className="eeg-destello"
+        style={{ mixBlendMode: 'screen' }}
       />
     </svg>
   )
@@ -183,6 +184,33 @@ export function Badge({ color, children }: { color: string; children: ReactNode 
   )
 }
 
+// Conexión de un cubo esclavo. No depende solo del color (guía «color»,
+// WCAG 1.4.1): rojo/verde es la combinación que no distingue cerca del 8 %
+// de los hombres, así que la forma también cambia — círculo lleno con ✓ si
+// está conectado, aro vacío con ✕ si no — y lleva un nombre accesible en
+// vez de depender del title, que no se ve en celulares ni lo lee un lector
+// de pantalla de forma fiable.
+export function PuntoConexion({ id, conectado }: { id: number; conectado: boolean }) {
+  const texto = `Cubo ${id}: ${conectado ? 'conectado' : 'sin conexión'}`
+  const color = conectado ? 'var(--color-online)' : 'var(--color-offline)'
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" role="img" aria-label={texto} style={{ display: 'block', flexShrink: 0 }}>
+      <title>{texto}</title>
+      {conectado ? (
+        <>
+          <circle cx="8" cy="8" r="7.5" fill={color} />
+          <path d="M4.6 8.3 L7 10.6 L11.4 5.6" fill="none" stroke="#0b0f10" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      ) : (
+        <>
+          <circle cx="8" cy="8" r="6.5" fill="none" stroke={color} strokeWidth="2" />
+          <path d="M5.6 5.6 L10.4 10.4 M10.4 5.6 L5.6 10.4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
+  )
+}
+
 // Nombre de quien opera/registra — resaltado mientras falta, porque es lo
 // primero que se debe hacer al entrar. Siempre en mayúsculas.
 export function PersonField({ label, value, onConfirm, onClear, placeholder = 'nombre + Enter' }: {
@@ -193,9 +221,10 @@ export function PersonField({ label, value, onConfirm, onClear, placeholder = 'n
   placeholder?: string
 }) {
   const [draft, setDraft] = useState('')
+  const idCampo = useId()
   return (
     <div>
-      <div style={{ ...sectionLabel, color: 'var(--color-blue)', fontSize: '11px' }}>{label}</div>
+      <label htmlFor={idCampo} style={{ ...sectionLabel, color: 'var(--color-blue)', fontSize: '11px', display: 'block' }}>{label}</label>
       {value ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
           <Electrode on />
@@ -208,9 +237,15 @@ export function PersonField({ label, value, onConfirm, onClear, placeholder = 'n
       ) : (
         <div style={{ marginTop: '8px' }}>
           <input
+            id={idCampo}
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && draft.trim()) onConfirm(draft.trim().toUpperCase()) }}
+            onKeyDown={e => {
+              // isComposing / 229: el Enter que confirma una composición de IME
+              // (teclados de japonés, chino, coreano) no debe confirmar el nombre.
+              if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return
+              if (draft.trim()) onConfirm(draft.trim().toUpperCase())
+            }}
             placeholder={placeholder}
             autoFocus
             title="Escribe el nombre y confirma con Enter — queda en cada evento de la bitácora. No es un identificador oficial del proyecto (ver DECISIONES_PROYECTO.md)."

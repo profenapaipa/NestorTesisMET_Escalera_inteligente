@@ -17,6 +17,11 @@ export type Version = {
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.12.0', fecha: '2026-11-21', publica: true,
+    titulo: 'Accesibilidad',
+    cambios: 'Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados.',
+  },
+  {
     version: '0.11.0', fecha: '2026-11-21', publica: true,
     titulo: 'Primera versión pública con historial propio',
     cambios: 'Colores de los grafos auditados para daltonismo y contraste; leyenda y «cómo leerlo» en cada grafo; correcciones de una auditoría independiente (análisis de la mediación, motor PPA, importación, exportación).',

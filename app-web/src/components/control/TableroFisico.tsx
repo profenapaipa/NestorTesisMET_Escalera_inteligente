@@ -11,6 +11,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import Cube from '../Cube'
 import IndicadorBateria from './IndicadorBateria'
+import { PuntoConexion } from '../../ui/brand'
 import type { PPAPhase } from '../../core/ppa/ppaColors'
 
 export type CubeVisual = { hex: string; accion?: PPAPhase; pulso?: true }
@@ -110,13 +111,7 @@ export default function TableroFisico({
               )}
             </div>
             {mostrarConexion && (
-              vacia ? <div style={{ width: '13px', height: '13px' }} /> : (
-                <div title={`Cubo #${celda.id} — ${celda.conectado ? 'conectado' : 'sin conexión'}`} style={{
-                  width: '13px', height: '13px', borderRadius: '50%',
-                  background: celda.conectado ? 'var(--color-online)' : 'var(--color-offline)',
-                  boxShadow: `0 0 0 3px ${celda.conectado ? 'rgba(66,190,101,0.22)' : 'rgba(250,77,86,0.22)'}`,
-                }} />
-              )
+              vacia ? <div style={{ width: '16px', height: '16px' }} /> : <PuntoConexion id={celda.id} conectado={celda.conectado === true} />
             )}
             {celdas.some(c => c.bateria) && (
               celda.bateria

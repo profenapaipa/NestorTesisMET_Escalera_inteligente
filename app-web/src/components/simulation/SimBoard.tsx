@@ -148,7 +148,7 @@ function SimBoard({
     return {
       width: `${Math.round(72 * scale)}px`, height: `${Math.round(80 * scale)}px`, borderRadius: '10px', flexShrink: 0,
       background: empty ? EMPTY_HEX : action ? PPA_HEX[action] : TEAM_HEX[cell!.team],
-      opacity: empty && !isLegal && !isHintTo && errorCell !== i ? 0.55 : 1,
+      opacity: empty && !isLegal && !isHintTo && errorCell !== i ? 0.75 : 1,
       boxShadow: ring,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
       padding: '8px 4px 6px', boxSizing: 'border-box',

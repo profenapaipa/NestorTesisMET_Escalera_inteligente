@@ -129,7 +129,7 @@ export default function PantallaInicio({ onAbrir }: { onAbrir: (participante: st
           <label style={{ display: 'block', marginBottom: '12px' }}>
             <span style={{ ...sectionLabel, color: 'var(--color-blue)' }}>Nuevo participante</span>
             <input autoFocus value={participante} onChange={e => setParticipante(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') abrir() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !(e.nativeEvent.isComposing || e.keyCode === 229)) abrir() }}
               placeholder="nombre de quien juega la sesión" style={{ ...campo, marginTop: '7px' }} />
           </label>
           <button onClick={abrir} disabled={!listo}

@@ -27,11 +27,15 @@
   --color-bg: #0B0F10;
   --color-panel: #12181A;
   --color-line: #232C2F;
-  --color-line-strong: #3A464A;
+  /* line-strong dibuja bordes de campos y botones: 3,4:1 sobre el panel
+     (WCAG 1.4.11 pide 3:1 para el contorno de un control). Antes #3A464A, 1,8:1. */
+  --color-line-strong: #5F6E72;
 
   --color-paper: #E7EDEE;
   --color-paper-dim: #9FB0B3;
-  --color-paper-faint: #647275;
+  /* Texto secundario de 10-11 px: 4,8:1 sobre el panel (WCAG 1.4.3 pide 4,5:1).
+     Antes #647275, 3,6:1. */
+  --color-paper-faint: #788789;
 
   /* Marca — azul/rojo de los dos equipos del juego, tomados de la paleta
      de IBM Carbon Design System (Blue 50 / Red 50): coherente a propósito
@@ -91,6 +95,24 @@ body {
   85%       { stroke-dasharray: 12 88; stroke-dashoffset: -12; opacity: 1; }
   88%, 100% { stroke-dasharray: 12 88; stroke-dashoffset: -12; opacity: 0; }
 }
+
+/* El destello del trazo EEG (brand.tsx) solo corre si el sistema no pide
+   reducir el movimiento; con «reducir movimiento» el trazo queda quieto. */
+.eeg-destello {
+  opacity: 0;
+  @media (prefers-reduced-motion: no-preference) { animation: eeg-sweep 7s linear infinite; }
+}
+
+/* Tamaño mínimo de los controles (guía «form-factor-adaptation»): 24 px con
+   mouse (WCAG 2.5.8) y 44 px en pantallas táctiles (WCAG 2.5.5), donde el
+   dedo es menos preciso. :where() no suma especificidad, así que cualquier
+   tamaño mayor definido en el componente sigue mandando. */
+:root { --tamano-objetivo: 24px; }
+@media (pointer: coarse) { :root { --tamano-objetivo: 44px; } }
+:where(button, select, [role="button"], input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"])) {
+  min-block-size: var(--tamano-objetivo);
+}
+:where(button, [role="button"]) { min-inline-size: var(--tamano-objetivo); }
 
 /* Mesa de trabajo de las pestañas de Simulación: tablero y controles a la
    izquierda, grafo de estados a la derecha. En pantallas anchas ambas
@@ -156,10 +178,10 @@ body {
   --color-bg: #ffffff;
   --color-panel: #f2f5f6;
   --color-line: #dbe1e3;
-  --color-line-strong: #aeb9bc;
+  --color-line-strong: #7f8c8f; /* 3,2:1 sobre el panel claro (antes #aeb9bc, 1,8:1) */
   --color-paper: #0c1315;
   --color-paper-dim: #455457;
-  --color-paper-faint: #6a787b;
+  --color-paper-faint: #5f6d70; /* 4,9:1 sobre el panel claro (antes #6a787b, 4,2:1) */
   --color-blue: #0f62fe;   /* Carbon Blue 60 */
   --color-red: #da1e28;    /* Carbon Red 60 */
   --color-online: #198038; /* Carbon Green 60 */

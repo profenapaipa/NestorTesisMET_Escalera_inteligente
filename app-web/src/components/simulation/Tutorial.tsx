@@ -314,7 +314,9 @@ function Tutorial({ level, operatorId, participante, onComplete, onGoToLevel, on
           background: 'var(--color-panel)', border: '1px solid var(--color-line)', borderLeft: `4px solid ${TONE_COLOR[feedback.tone]}`,
           borderRadius: 'var(--radius)', padding: '14px 18px', display: 'flex', gap: '18px', alignItems: 'center', flexWrap: 'wrap',
         }}>
-          <div style={{ flex: 1, minWidth: '260px' }}>
+          {/* aria-live: el lector de pantalla lee cada mensaje nuevo del
+              entrenador (acierto, error explicado, pista) sin mover el foco. */}
+          <div aria-live="polite" aria-atomic="true" style={{ flex: 1, minWidth: '260px' }}>
             <div style={{ ...sectionLabel, color: TONE_COLOR[feedback.tone] }}>
               Nivel {level} · {feedback.tone === 'error' ? 'Movimiento no permitido' : feedback.tone === 'warn' ? 'Atención' : feedback.tone === 'ok' ? 'Correcto' : 'Guía'}
             </div>

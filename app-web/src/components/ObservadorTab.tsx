@@ -3,7 +3,7 @@ import { useAjusteAncho, anchoFila } from '../ui/useAjusteAncho'
 import { PPA_HEX, PPA_TEXT, PPA_LABEL } from '../core/ppa/ppaColors'
 import { toCsvGeneric, downloadFile, nowIso } from '../core/bitacora/csv'
 import type { ControlSnapshot } from '../App'
-import { PageFrame, Panel, PersonField, Badge, SectionTitle, Collapsible, LogPanel, TwoColumn, Electrode } from '../ui/brand'
+import { PageFrame, Panel, PersonField, Badge, SectionTitle, Collapsible, LogPanel, TwoColumn, Electrode, PuntoConexion } from '../ui/brand'
 import { sectionLabel, sessionBtn, TEAM_HEX } from '../ui/styles'
 import GrafoEstados from './simulation/GrafoEstados'
 import InformeNivel from './informe/InformeNivel'
@@ -133,20 +133,14 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
                   <div style={{
                     width: '72px', height: '80px', borderRadius: '10px', boxSizing: 'border-box', padding: '8px 4px 6px',
                     background: id === 0 ? '#808080' : action ? PPA_HEX[action] : TEAM_HEX[id <= 5 ? 'A' : 'B'],
-                    opacity: id === 0 ? 0.55 : 1, boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
+                    opacity: id === 0 ? 0.75 : 1, boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
                     color: action ? '#10141a' : '#fff',
                   }}>
                     <span style={{ fontSize: '20px', fontWeight: 700, lineHeight: 1 }}>{id || ''}</span>
                     {action && <span style={{ fontSize: '10px', fontWeight: 700 }}>{PPA_LABEL[action]}</span>}
                   </div>
-                  {id === 0 ? <div style={{ width: '13px', height: '13px' }} /> : (
-                    <div title={`Cubo #${id} — ${on ? 'conectado' : 'sin conexión'}`} style={{
-                      width: '13px', height: '13px', borderRadius: '50%',
-                      background: on ? 'var(--color-online)' : 'var(--color-offline)',
-                      boxShadow: `0 0 0 3px ${on ? 'rgba(66,190,101,0.22)' : 'rgba(250,77,86,0.22)'}`,
-                    }} />
-                  )}
+                  {id === 0 ? <div style={{ width: '16px', height: '16px' }} /> : <PuntoConexion id={id} conectado={on} />}
                 </div>
               )
             })}
@@ -184,7 +178,7 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
         <textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); registrar('Nota') } }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (e.nativeEvent.isComposing || e.keyCode === 229) return; registrar('Nota') } }}
           placeholder="Describe lo que observas (opcional si usas una etiqueta) — Enter registra, Shift+Enter hace salto de línea"
           rows={3}
           style={{

@@ -71,7 +71,7 @@ export default function GuardarInforme({ tipo, titulo, base, sesion, html, json,
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--color-paper)', marginBottom: '6px' }}>
             Nombre del informe
             <input value={nombre} onChange={e => setNombre(e.target.value)} autoFocus maxLength={140}
-              onKeyDown={e => { if (e.key === 'Enter') void guardar(); if (e.key === 'Escape') setAbierto(false) }}
+              onKeyDown={e => { if (e.key === 'Enter' && !(e.nativeEvent.isComposing || e.keyCode === 229)) void guardar(); if (e.key === 'Escape') setAbierto(false) }}
               style={{
                 display: 'block', width: '100%', marginTop: '5px', padding: '7px 9px', fontSize: '12.5px', fontWeight: 400,
                 background: 'var(--color-bg)', color: 'var(--color-paper)', border: '1px solid var(--color-line-strong)', borderRadius: 'var(--radius)',

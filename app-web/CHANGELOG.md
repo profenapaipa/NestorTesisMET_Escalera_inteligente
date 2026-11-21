@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.12.0** | 2026-11-21 | Accesibilidad | Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados. |
 | **0.11.0** | 2026-11-21 | Primera versión pública con historial propio | Colores de los grafos auditados para daltonismo y contraste; leyenda y «cómo leerlo» en cada grafo; correcciones de una auditoría independiente (análisis de la mediación, motor PPA, importación, exportación). |
 | **0.10.0** \* | 2026-11-20 | Celulares, ayuda integrada y grafos para publicar | Interfaz adaptada a celulares; limitaciones conocidas y guía rápida en la app; paleta académica; figura HD de cada grafo con leyenda y créditos. |
 | **0.9.0** \* | 2026-11-20 | Versionado y trazabilidad | Versión y commit en cada informe, sesión y paquete; fechas al segundo con zona horaria; HTML interactivo con rutas mínimas; perfiles simulados descriptivos. |
@@ -32,6 +33,16 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.12.0 · 2026-11-21 · accesibilidad
+
+- La página se declara en español (`<html lang="es">`): los lectores de pantalla ya no la leen con pronunciación inglesa.
+- **Contraste WCAG:** texto secundario de 3,6:1 a 4,8:1; bordes de campos y botones de 1,8:1 a 3,4:1; casilla vacía del tablero de 2,3:1 a 3,1:1; ajustes equivalentes en la superficie de los informes.
+- La conexión de cada cubo ya no depende solo del color: círculo lleno con ✓ si está conectado, aro con ✕ si no, con nombre accesible (Control y Vista de observador).
+- Se respeta «reducir movimiento» del sistema: sin destello del trazo ni barras de vibración animadas; las señales de fase conservan un halo fijo de su color.
+- Controles de al menos 24 px con mouse y 44 px en pantallas táctiles.
+- Las pestañas forman una navegación con nombre y la activa se anuncia; los campos de nombre tienen etiqueta real; el mensaje del Tutorial guiado se anuncia a lectores de pantalla.
+- Los campos que confirman con Enter ya no lo hacen a mitad de una composición de IME.
 
 ## 0.11.0 · 2026-11-21 · primera versión del historial público
 
