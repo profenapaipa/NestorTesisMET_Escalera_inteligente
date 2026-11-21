@@ -17,6 +17,11 @@ export type Version = {
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.12.1', fecha: '2026-11-21', publica: true,
+    titulo: 'Textos sin montarse en celular y computador',
+    cambios: 'Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse.',
+  },
+  {
     version: '0.12.0', fecha: '2026-11-21', publica: true,
     titulo: 'Accesibilidad',
     cambios: 'Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados.',

@@ -23,7 +23,7 @@ export function DistintivoVersion({ onAbrir }: { onAbrir: () => void }) {
         background: 'transparent', border: '1px solid var(--color-line-strong)', borderRadius: '999px',
         padding: '3px 9px', color: 'var(--color-paper-dim)', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.04em',
       }}>
-      <Info size={11} /> v{VERSION_APP} · en desarrollo
+      <Info size={11} /> v{VERSION_APP}<span className="distintivo-version__estado"> · en desarrollo</span>
     </button>
   )
 }
@@ -77,7 +77,9 @@ export function Limitaciones({ onCerrar }: { onCerrar: () => void }) {
 export function GuiaVista({ vista }: { vista: string }) {
   const g = GUIA_VISTA[vista]
   const clave = `escalera.guia.${vista}`
-  const [abierta, setAbierta] = useState(() => leer(clave, true))
+  // En el celular empieza cerrada: abierta ocupaba más de media pantalla
+  // fija sobre la vista (auditoría de textos, 2026-11-21).
+  const [abierta, setAbierta] = useState(() => leer(clave, !window.matchMedia('(max-width: 760px)').matches))
   if (!g) return null
   const cambiar = () => { setAbierta(a => { guardar(clave, !a); return !a }) }
   return (
@@ -92,7 +94,7 @@ export function GuiaVista({ vista }: { vista: string }) {
           Cómo usar esta vista
         </button>
         {abierta && (
-          <div style={{ padding: '4px 0 6px 19px', fontSize: '12px', lineHeight: 1.55, color: 'var(--color-paper-dim)' }}>
+          <div className="guia-vista__pasos" style={{ padding: '4px 0 6px 19px', fontSize: '12px', lineHeight: 1.55, color: 'var(--color-paper-dim)' }}>
             <ol style={{ margin: 0, paddingLeft: '16px' }}>
               {g.pasos.map(p => <li key={p}>{p}</li>)}
             </ol>

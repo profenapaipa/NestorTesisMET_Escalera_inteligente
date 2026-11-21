@@ -17,13 +17,13 @@ import { StepMark, WIDE_MAX } from './ui/brand'
 
 type Tab = 'control' | 'jugador' | 'tutorial' | 'libre' | 'observador' | 'informes'
 
-const TABS: { id: Tab; label: string; mode: string; modeColor: string }[] = [
-  { id: 'control', label: '1 · Control Mago de Oz', mode: 'Hardware real', modeColor: 'var(--color-online)' },
-  { id: 'jugador', label: 'Vista del jugador', mode: 'Pantalla del participante', modeColor: 'var(--color-online)' },
-  { id: 'tutorial', label: '2 · Tutorial guiado', mode: 'Sin hardware — aprendizaje', modeColor: 'var(--color-blue)' },
-  { id: 'libre', label: '3 · Simulación libre', mode: 'Sin hardware — práctica', modeColor: 'var(--color-blue)' },
-  { id: 'observador', label: '4 · Vista de observador', mode: 'Solo lectura', modeColor: 'var(--color-paper-dim)' },
-  { id: 'informes', label: '5 · Informes', mode: 'Sesiones guardadas', modeColor: 'var(--color-blue)' },
+const TABS: { id: Tab; label: string; short: string; mode: string; modeColor: string }[] = [
+  { id: 'control', label: '1 · Control Mago de Oz', short: '1 · Control', mode: 'Hardware real', modeColor: 'var(--color-online)' },
+  { id: 'jugador', label: 'Vista del jugador', short: 'Jugador', mode: 'Pantalla del participante', modeColor: 'var(--color-online)' },
+  { id: 'tutorial', label: '2 · Tutorial guiado', short: '2 · Tutorial', mode: 'Sin hardware — aprendizaje', modeColor: 'var(--color-blue)' },
+  { id: 'libre', label: '3 · Simulación libre', short: '3 · Simulación', mode: 'Sin hardware — práctica', modeColor: 'var(--color-blue)' },
+  { id: 'observador', label: '4 · Vista de observador', short: '4 · Observador', mode: 'Solo lectura', modeColor: 'var(--color-paper-dim)' },
+  { id: 'informes', label: '5 · Informes', short: '5 · Informes', mode: 'Sesiones guardadas', modeColor: 'var(--color-blue)' },
 ]
 
 function Shell() {
@@ -64,14 +64,19 @@ function Shell() {
         {/* Las pestañas siguen siendo botones (la prueba de navegación los busca
             por rol de botón); la activa se anuncia con aria-current, que es la
             semántica de una navegación entre vistas. */}
-        <nav aria-label="Vistas de la aplicación" className="barra-pestanas" style={{
-          display: 'flex', alignItems: 'stretch', gap: '4px', maxWidth: tab === 'tutorial' || tab === 'libre' ? WIDE_MAX : '1400px', margin: '0 auto',
+        {/* Dos carriles (auditoría de textos, 2026-11-21): las pestañas se
+            desplazan si no caben; las acciones quedan siempre a la vista. */}
+        <div className="barra-superior" style={{
+          display: 'flex', alignItems: 'stretch', maxWidth: tab === 'tutorial' || tab === 'libre' ? WIDE_MAX : '1400px', margin: '0 auto',
           padding: '0 20px', boxSizing: 'border-box',
+        }}>
+        <nav aria-label="Vistas de la aplicación" className="barra-pestanas" style={{
+          display: 'flex', alignItems: 'stretch', gap: '4px', flex: 1, minWidth: 0,
         }}>
           {TABS.map(t => {
             const active = t.id === tab
             return (
-              <button key={t.id} className="pestana" aria-current={active ? 'page' : undefined} onClick={() => setTab(t.id)} style={{
+              <button key={t.id} className="pestana" aria-label={t.label} aria-current={active ? 'page' : undefined} onClick={e => { setTab(t.id); e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }) }} style={{
                 display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 14px 10px',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 borderBottom: `2px solid ${active ? 'var(--color-blue)' : 'transparent'}`,
@@ -80,19 +85,21 @@ function Shell() {
                 letterSpacing: '0.08em', textTransform: 'uppercase',
               }}>
                 <StepMark color={active ? 'var(--color-blue)' : 'var(--color-line-strong)'} size={11} />
-                {t.label}
+                <span className="pestana__larga">{t.label}</span>
+                <span className="pestana__corta" aria-hidden="true">{t.short}</span>
               </button>
             )
           })}
-          <span className="modo-pestana" style={{
-            marginLeft: 'auto', alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '6px',
+        </nav>
+          <span className="acciones-pestana" style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '14px' }}>
+          <span className="modo-pestana" title={current.mode} style={{
+            alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '6px',
             fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase',
             color: current.modeColor,
           }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: current.modeColor }} />
-            {current.mode}
+            <span className="modo-pestana__texto">{current.mode}</span>
           </span>
-          <span className="acciones-pestana" style={{ alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '14px' }}>
             <DistintivoVersion onAbrir={() => setLimitaciones(true)} />
             <BotonTerminarSesion onClick={() => setInformeAbierto(true)} />
             {/* Quién está usando la aplicación, y desde aquí se releva. */}
@@ -103,7 +110,7 @@ function Shell() {
               onCambiar={(nombre, rol) => { setInformeAbierto(false); cerrarSesion(); abrirSesion(nombre, operatorId, rol) }}
               onCreditos={() => setCreditos(true)} />
           </span>
-        </nav>
+        </div>
       </div>
 
       {/* Fase 2 de la guía: cómo usar la vista abierta (se puede cerrar). */}

@@ -221,13 +221,55 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .dc-lateral { width: 100% !important; }
 }
 @media (max-width: 760px) {
-  /* Pestañas: una sola línea con desplazamiento propio, sin ensanchar la página. */
-  .barra-pestanas { overflow-x: auto; flex-wrap: nowrap !important; padding: 0 8px !important; scrollbar-width: thin; }
-  .barra-pestanas .pestana { white-space: nowrap; flex-shrink: 0; padding: 10px 10px 8px !important; letter-spacing: 0.04em !important; }
-  .modo-pestana { display: none !important; }
-  .acciones-pestana { margin-left: 8px !important; flex-shrink: 0; }
+  .barra-pestanas .pestana { padding: 10px 10px 8px !important; letter-spacing: 0.04em !important; }
   /* Márgenes de la página más ajustados. */
   .marco-pagina { padding: 12px 12px !important; }
+}
+/* Auditoría de textos montados (2026-11-21). */
+/* Barra superior en dos carriles: las pestañas nunca se parten en dos líneas
+   y se desplazan si no caben; las acciones (modo, versión, Terminar sesión,
+   perfil) no se mueven ni se encogen. */
+.barra-pestanas { overflow-x: auto; scrollbar-width: none; }
+.barra-pestanas::-webkit-scrollbar { display: none; }
+.barra-pestanas .pestana { white-space: nowrap; flex-shrink: 0; }
+.acciones-pestana { flex-shrink: 0; white-space: nowrap; }
+/* El modo queda como punto de color (en la versión anterior su texto partía
+   la barra en dos líneas); el texto sigue para lectores de pantalla y como
+   globo al pasar el puntero. */
+.modo-pestana__texto, .distintivo-version__estado { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Nombres de las pestañas: cortos por defecto; completos solo si la barra
+   (no la ventana: la barra tiene ancho máximo) mide 1500 px o más. En un
+   navegador sin container queries quedan los cortos, que siempre caben. El
+   nombre completo es además la etiqueta accesible de cada botón. */
+.barra-superior { container-type: inline-size; container-name: barra; }
+.pestana__larga { display: none; }
+.barra-pestanas .pestana { padding-left: 9px !important; padding-right: 9px !important; letter-spacing: 0.05em !important; }
+@container barra (min-width: 1500px) {
+  .pestana__larga { display: inline; }
+  .pestana__corta { display: none; }
+  .distintivo-version__estado { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+}
+@media (max-width: 1500px) {
+  .barra-superior { padding: 0 10px !important; }
+}
+@media (max-width: 760px) {
+  /* Celular: las acciones en su propia fila, arriba; las pestañas debajo. */
+  .barra-superior { flex-wrap: wrap; padding: 0 8px !important; }
+  .acciones-pestana { order: -1; width: 100%; justify-content: flex-end; margin: 0 !important; padding: 6px 0 2px; }
+  .barra-pestanas { flex: 0 0 100% !important; }
+  /* Difuminado en los bordes: avisa que hay más pestañas a los lados. */
+  .barra-pestanas { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%); }
+  /* Tarjetas Pausar/Pensar/Actuar/Estado inicial: dos por fila. */
+  .rejilla-ppa { grid-template-columns: repeat(2, 1fr) !important; }
+  /* «Cómo usar esta vista» abierta: como máximo un tercio de la pantalla. */
+  .guia-vista__pasos { max-height: 32vh; overflow-y: auto; }
+}
+@media (max-width: 1100px) {
+  /* Niveles del tutorial: número y estrellas; el título está en el panel de abajo. */
+  .nivel-tutorial { flex-direction: column !important; gap: 4px !important; padding: 6px 2px !important; align-items: center !important; }
+  .nivel-tutorial__titulo, .nivel-tutorial__pares { display: none !important; }
+  .nivel-tutorial__texto { flex: none !important; }
+  .nivel-tutorial__pie { justify-content: center !important; font-size: 9px !important; }
 }
 @media (max-width: 760px) {
   /* Miniaturas del tutorial (11 casillas de 30 px): más pequeñas para caber. */

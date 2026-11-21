@@ -231,7 +231,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
             <><Electrode on={false} /><span style={{ color: 'var(--color-paper-faint)' }}>Toca un cubo del tablero para seleccionarlo</span></>
           )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+        <div className="rejilla-ppa" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
           {(['pausar', 'pensar', 'actuar'] as const).map(a => (
             <button key={a} onClick={() => guarded(() => send(a))} style={signalBtn(a)}>
               <SignalGlyph phase={a} color={PPA_TEXT[a]} />

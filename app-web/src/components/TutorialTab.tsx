@@ -52,12 +52,14 @@ function TutorialTab({ operatorId, participante, setParticipante, onGoToFreeSim 
           <SectionTitle right={<span style={{ fontSize: '11px', color: 'var(--color-paper-faint)' }}>{done}/5 superados · se recomienda ir en orden · <span style={{ color: 'var(--color-caution)' }}>★★★</span> sin errores, pistas ni deshacer</span>}>
             Niveles · pares
           </SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
+          <div className="niveles-tutorial" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
             {[1, 2, 3, 4, 5].map(n => {
               const stars = progress[n] ?? 0
               const active = n === level
               return (
-                <button key={n} onClick={() => setLevel(n)} style={{
+                <button key={n} onClick={() => setLevel(n)} className="nivel-tutorial"
+                  aria-label={`Nivel ${n}: ${LEVELS[n].titulo}, ${n} par${n > 1 ? 'es' : ''}, ${stars} de 3 estrellas`}
+                  aria-current={active ? 'step' : undefined} title={LEVELS[n].titulo} style={{
                   display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left', padding: '6px 8px', minWidth: 0,
                   borderRadius: 'var(--radius)', cursor: 'pointer',
                   background: active ? 'rgba(69,137,255,0.10)' : 'var(--color-bg)',
@@ -72,10 +74,10 @@ function TutorialTab({ operatorId, participante, setParticipante, onGoToFreeSim 
                     border: `1px solid ${active ? 'var(--color-blue)' : 'var(--color-line-strong)'}`,
                     color: active ? '#fff' : 'var(--color-paper-dim)',
                   }}>{n}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{LEVELS[n].titulo}</span>
-                    <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-paper-faint)' }}>
-                      <span>{n} par{n > 1 ? 'es' : ''}</span>
+                  <span className="nivel-tutorial__texto" style={{ flex: 1, minWidth: 0 }}>
+                    <span className="nivel-tutorial__titulo" style={{ display: 'block', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{LEVELS[n].titulo}</span>
+                    <span className="nivel-tutorial__pie" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--color-paper-faint)' }}>
+                      <span className="nivel-tutorial__pares">{n} par{n > 1 ? 'es' : ''}</span>
                       <span aria-label={`${stars} estrellas`}>
                         {[1, 2, 3].map(i => <span key={i} style={{ color: i <= stars ? 'var(--color-caution)' : 'var(--color-line-strong)' }}>★</span>)}
                       </span>

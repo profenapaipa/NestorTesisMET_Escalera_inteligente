@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.12.1** | 2026-11-21 | Textos sin montarse en celular y computador | Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse. |
 | **0.12.0** | 2026-11-21 | Accesibilidad | Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados. |
 | **0.11.0** | 2026-11-21 | Primera versión pública con historial propio | Colores de los grafos auditados para daltonismo y contraste; leyenda y «cómo leerlo» en cada grafo; correcciones de una auditoría independiente (análisis de la mediación, motor PPA, importación, exportación). |
 | **0.10.0** \* | 2026-11-20 | Celulares, ayuda integrada y grafos para publicar | Interfaz adaptada a celulares; limitaciones conocidas y guía rápida en la app; paleta académica; figura HD de cada grafo con leyenda y créditos. |
@@ -33,6 +34,16 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.12.1 · 2026-11-21 · textos sin montarse
+
+Auditoría automática de las seis vistas en cinco anchos (390, 768, 1280, 1440 y 1920 px), bajando por cada vista: textos que desbordan su caja, recortados, solapados, fuera de pantalla y controles de la barra ocultos. Resultado: 0 hallazgos (antes: el botón «Terminar sesión» cortado o fuera de la barra en el computador, tarjetas de nivel ilegibles en el celular).
+
+- **Barra superior en dos carriles.** Las pestañas se desplazan si no caben, sin partirse en dos líneas; versión, «Terminar sesión» y perfil quedan siempre a la vista. En el celular, las acciones van en una fila propia sobre las pestañas, con un difuminado que avisa que hay más pestañas a los lados, y la pestaña elegida se centra.
+- **Nombres de pestaña cortos** («1 · Control», «2 · Tutorial»…) cuando la barra mide menos de 1500 px; el nombre completo sigue como etiqueta accesible. El modo de la vista queda como punto de color con su texto para lectores de pantalla y al pasar el puntero.
+- **«Cómo usar esta vista»** empieza cerrada en el celular y, abierta, ocupa como máximo un tercio de la pantalla (antes, más de la mitad fija sobre la vista).
+- **Tutorial:** por debajo de 1100 px, las tarjetas de nivel muestran número y estrellas (el título está en el panel del nivel y en la etiqueta del botón).
+- **Celular:** las tarjetas Pausar/Pensar/Actuar/Estado inicial van de dos en dos; los títulos de sección y el encabezado del tablero bajan de línea lo de la derecha en vez de partirse en una columna.
 
 ## 0.12.0 · 2026-11-21 · accesibilidad
 

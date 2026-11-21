@@ -73,7 +73,9 @@ export function StepMark({ color = 'var(--color-paper-faint)', size = 13 }: { co
 export function SectionTitle({ children, right, color }: { children: ReactNode; right?: ReactNode; color?: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-      <span style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: '6px', color: color ?? sectionLabel.color }}>
+      {/* Ancho mínimo: en pantallas angostas lo de la derecha baja a otra
+          línea en vez de exprimir el título en una columna (2026-11-21). */}
+      <span style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: '6px', color: color ?? sectionLabel.color, flex: '1 1 auto', minWidth: 'min(100%, 260px)' }}>
         <StepMark color={color} />{children}
       </span>
       {right}

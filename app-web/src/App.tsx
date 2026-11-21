@@ -1629,8 +1629,8 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
              pares/11 posiciones: ancho completo del panel, no una columna
              estrecha. */}
         <div style={{ ...panel, flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: '6px' }}><StepMark />Tablero · {pares} par{pares > 1 ? 'es' : ''} · {visibleCubes.length} posiciones · esclavos {esclavos.length}/10</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 auto', minWidth: 'min(100%, 260px)' }}><StepMark />Tablero · {pares} par{pares > 1 ? 'es' : ''} · {visibleCubes.length} posiciones · esclavos {esclavos.length}/10</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ display: 'flex', gap: '14px' }}>
                 {[
@@ -1832,7 +1832,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+          <div className="rejilla-ppa" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
             {(['pausar', 'pensar', 'actuar'] as const).map(a => (
               <button key={a} onClick={() => sendAction(a)} style={signalBtn(a)}>
                 <SignalGlyph phase={a} color={PPA_TEXT[a]} />

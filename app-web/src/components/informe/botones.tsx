@@ -27,7 +27,7 @@ export function BotonTerminarSesion({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       title="Informe general: las cuatro pestañas y todos los niveles de esta sesión"
-      style={{ ...sessionBtn(true, 'var(--color-caution)'), color: '#1a1300', padding: '6px 12px', fontSize: '12px' }}
+      style={{ ...sessionBtn(true, 'var(--color-caution)'), color: '#1a1300', padding: '6px 12px', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}
     >
       <ClipboardList size={13} /> Terminar sesión
     </button>
