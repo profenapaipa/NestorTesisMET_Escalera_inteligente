@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.12.2** | 2026-11-21 | Logo oficial en la pestaña del navegador | La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular. |
 | **0.12.1** | 2026-11-21 | Textos sin montarse en celular y computador | Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse. |
 | **0.12.0** | 2026-11-21 | Accesibilidad | Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados. |
 | **0.11.0** | 2026-11-21 | Primera versión pública con historial propio | Colores de los grafos auditados para daltonismo y contraste; leyenda y «cómo leerlo» en cada grafo; correcciones de una auditoría independiente (análisis de la mediación, motor PPA, importación, exportación). |
@@ -34,6 +35,12 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.12.2 · 2026-11-21 · logo oficial en la pestaña
+
+- La pestaña del navegador muestra la marca de Escalera Inteligente (la escalera de `Logo`, mitad azul y mitad roja), centrada para leerse a 16 px. Antes mostraba el ícono genérico de Vite con una ruta absoluta (`/vite.svg`) que en GitHub Pages ni siquiera cargaba.
+- `favicon.svg` para navegadores actuales, `favicon-32.png` como respaldo y `apple-touch-icon.png` (180 px, fondo de la app) para iPhone y iPad; rutas relativas.
+- En el celular, la barra del navegador toma el color de fondo de la app (`theme-color`).
 
 ## 0.12.1 · 2026-11-21 · textos sin montarse
 

@@ -17,6 +17,11 @@ export type Version = {
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.12.2', fecha: '2026-11-21', publica: true,
+    titulo: 'Logo oficial en la pestaña del navegador',
+    cambios: 'La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular.',
+  },
+  {
     version: '0.12.1', fecha: '2026-11-21', publica: true,
     titulo: 'Textos sin montarse en celular y computador',
     cambios: 'Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse.',
