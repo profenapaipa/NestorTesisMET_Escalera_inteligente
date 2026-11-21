@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.env
+.env.*
+
+# Credenciales del firmware: solo local. Plantilla: secrets.example.h
+secrets.h
+
+# Datos de participantes: nunca en este repositorio
+backend/bitacoras/
+*-Sesi*n*/
+DATOS_PRIVADOS*/

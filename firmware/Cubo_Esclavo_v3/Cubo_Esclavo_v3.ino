@@ -1,0 +1,721 @@
+// ============================================================
+//  Cubo_Esclavo_v3.ino
+//  Firmware del ESP32-C3 SuperMini (cubo esclavo) — versión 3
+// ============================================================
+//  Parte de Cubo_Esclavo_v2.ino (Desarrollo_cubos_juego_escalera/
+//  Cubo_Esclavo_v2/), que se deja CONGELADO como backup fiel de la
+//  versión anterior (a su vez copia idéntica del original ACACIA:
+//  Versión1ACACIA-Cubos-inteligentes-main/.../Cubo-Esclavo.ino, que
+//  sigue sin tocarse bajo ninguna circunstancia).
+//
+//  ================================================================
+//  MOTIVO DEL CAMBIO (Fase 1 de optimización, 2026-09-17)
+//  ================================================================
+//  El maestro (Maestro_v3.ino) pasó de abrir una conexión TCP nueva
+//  por cada comando a mantener UNA conexión persistente por cubo.
+//  Este firmware se adapta para aceptar esa conexión persistente y
+//  atenderla sin bloquear, en vez de leer con readStringUntil()
+//  (bloqueante) y cerrar la conexión en cada vuelta como hacía
+//  Cubo_Esclavo_v2.ino.
+//
+//  Cambios respecto a Cubo_Esclavo_v2.ino:
+//   1. Conexión persistente: se acepta un cliente y se conserva
+//      mientras siga conectado, en vez de aceptar y soltar en cada
+//      mensaje. Se lee byte a byte con available()/read() (no
+//      bloqueante) y se arma la línea manualmente.
+//   2. Parpadeo del LED no bloqueante: confi_luces() usaba delay()
+//      dentro del propio parpadeo, lo que congelaba el socket (no se
+//      podían recibir comandos nuevos ni detectar una caída de WiFi
+//      mientras "parpadeaba"). Ahora es una máquina de estados basada
+//      en millis() que se actualiza en cada vuelta de loop().
+//  Los pendientes ya registrados en PENDIENTES_TESIS.md, sección
+//  "Configuración sensorial PPA de los cubos (Tabla 4.1)" siguen
+//  abiertos y no se tocan en este cambio:
+//   - Recalibrar la intensidad de vibración de Pausar.
+//   - Diferenciar el patrón de vibración por fase.
+//   - Definir un color inicial por defecto (azul/rojo según equipo).
+//   - Corregir el balance de canales del LED RGB (amarillo).
+//  El canal de sonido (buzzer) sigue resuelto por software desde el
+//  navegador del docente (ver App.tsx: playTone/playBipBip/
+//  playAscending).
+//
+//  Esta es la versión candidata a flashear en los cubos físicos. Antes
+//  de subirla a cada cubo, editar SOLO NUMERO_CUBO (más abajo) con el
+//  número de su etiqueta, de 1 a 10; la IP sale sola (192.168.4.2 para el
+//  cubo 1 ... 192.168.4.11 para el cubo 10, igual que ipEsclavos[] en
+//  Maestro_v3.ino).
+//
+//  ================================================================
+//  CONTROL DE PARTIDA Y CÓDIGO DE COLORES (Fase 2, 2026-09-17)
+//  ================================================================
+//  Se agregó un motor de "efectos" no bloqueante (EF=<n>, ver
+//  iniciarEfecto/actualizarEfecto): secuencias de color+vibración de
+//  varios pasos (conexión, movimiento inválido, bloqueo, victoria,
+//  cuenta regresiva) que corren enteras dentro del cubo con un solo
+//  mensaje, sin depender de que el frontend mande varios comandos
+//  seguidos. El cubo deriva su propio color de equipo (azul/rojo) del
+//  último octeto de su local_IP, sin configuración adicional.
+//
+//  ================================================================
+//  CORRECCIÓN (2026-09-18, prueba con hardware real)
+//  ================================================================
+//  Tras la prueba, los cubos no mostraban azul/rojo y Pausar/Pensar/
+//  Actuar no se reflejaban. Encontradas dos causas reales (no las
+//  señales de conexión EF=1/EF=2, que se habían agregado justo antes y
+//  se sospechaban al inicio — ver Maestro_v3.ino para el detalle):
+//   1. "restaurar" volvía el cubo a NEGRO (0,0,0). El frontend lo
+//      dispara en CADA evento de posición del tablero, así que
+//      cualquier cubo ya "modificado" (incluido el color de equipo de
+//      rutina) se apagaba solo con que OTRO cubo cambiara de posición.
+//      Corregido: "restaurar" ahora vuelve al color de equipo propio.
+//   2. El color de equipo al conectar dependía de que el maestro o el
+//      frontend se lo reafirmaran después. Corregido: conectarWifi()
+//      se asienta directo en el color de equipo (ya calculado antes,
+//      en setup(), desde local_IP), sin depender de nadie más.
+//  Se reactivó también Serial.begin(115200) (antes comentado) con
+//  trazas en cada punto de recepción/aplicación de comandos, para
+//  depurar por Monitor Serial si algo vuelve a fallar. Si el cubo usa
+//  USB nativo (no un chip USB-serie aparte), activar "USB CDC On Boot:
+//  Enabled" en Herramientas del IDE para poder ver estos mensajes.
+//
+//  ================================================================
+//  REFERENCIA ÚNICA DE PRIORIDAD VISUAL (2026-09-18)
+//  ================================================================
+//  La tabla completa de qué gana sobre qué (bloqueo > victoria > cuenta
+//  regresiva > sesión pausada > movimiento inválido > señal PPA manual >
+//  color de equipo en reposo) vive en ESTADO_VISUAL_CUBOS.md, en la raíz
+//  de Desarrollo_cubos_juego_escalera/ — la implementa
+//  core/ppa/cubeVisualState.ts en el frontend. Este firmware no decide
+//  esa prioridad por su cuenta: su único contrato es ejecutar cualquier
+//  EF=<n>/M=.../restaurar recibido como reemplazo atómico y completo del
+//  estado anterior (ya lo hace: iniciarEfecto/actualizarColorObjetivo/
+//  setColorSolid siempre apagan cualquier efecto en curso antes de
+//  aplicar el nuevo). Si se agrega un EF= nuevo o cambia el criterio de
+//  prioridad, actualizar ese documento primero.
+//
+//  ================================================================
+//  2026-10-15: color de equipo al arrancar + identificación por IP
+//  ================================================================
+//   - Al conectar el WiFi se asienta directo en su color de equipo (se
+//     retira el naranja de "esperando confirmación").
+//   - Comando nuevo "ID=0": baja el pin de presencia (Pfcaja) 250 ms y lo
+//     restaura solo; el maestro mira qué casilla pasó a 0 para saber dónde
+//     está este cubo. "ID=1" lo restaura de inmediato. Ver
+//     ESTADO_VISUAL_CUBOS.md, "Identificación por IP".
+//
+//  ================================================================
+//  2026-10-22: correcciones tras la prueba de banco con los cubos reales
+//  ================================================================
+//   - Conexión: una conexión nueva del maestro SIEMPRE reemplaza a la vieja
+//     (antes, si el maestro se reiniciaba, la vieja seguía "viva" para el
+//     cubo, la nueva nunca se atendía y había que reiniciar todo). Sin
+//     retardo de Nagle, WiFi sin ahorro de energía, y la conexión se cierra
+//     tras 9 s sin datos del maestro.
+//   - Ping: contesta "PG=<n>" con "PO=<n>" (latencia real maestro<->cubo).
+//   - Vibración: arranque de 80 ms a plena potencia y piso de PWM del 55 %;
+//     con el 45 % de Pausar (PWM 142) el motor no arrancaba y no se sentía.
+//   - Potencia WiFi de 11 dBm: reduce los picos de corriente que hundían la
+//     batería de 180 mAh (reinicios por caída de tensión en la bitácora).
+//   - Telemetría con la MAC del chip: permite ver si dos cubos comparten IP.
+//   - Cargar junto con Maestro_v3 de la misma fecha.
+//  ================================================================
+//  2026-11-20: patrón de vibración por fase (memoria muscular PPA)
+//  ================================================================
+//   - Campo opcional "VP=<n>" en la orden M=...: 1 = Pausar (dos pulsos
+//     largos), 2 = Pensar (tres pulsos cortos). Sin VP, o con VP=0, la
+//     vibración es continua (Actuar y todo lo demás), como antes.
+//   - Los tiempos son los mismos del sonido de cada fase en el navegador
+//     (core/utils/ppaTones.ts, playPpaFeedback) y de PPA_VIB_PATTERN
+//     (core/ppa/ppaColors.ts): color, sonido y vibración forman un solo
+//     código por fase. Si se cambian allí, hay que cambiarlos aquí.
+//   - No bloquea: máquina de estados con millis(), como el parpadeo.
+//   - Cierra el pendiente "Diferenciar el patrón de vibración por fase".
+//   - Cargar junto con Maestro_v3 de la misma fecha (reenvía VP=).
+// ============================================================
+
+#include <WiFi.h>
+#include "esp_system.h"
+
+
+//configuración de pines - LED, Motor y pinfisico
+
+const int motorpin = 5;
+const int Rpin = 4;  // Analog input pin that the potentiometer is attached to
+const int Gpin = 3;  // Analog output pin that the LED is attached to
+const int Bpin = 2;
+const int Pfcaja = 6;
+
+bool conex = false;
+
+
+// IP estática (debes evitar conflicto entre dispositivos)
+// Credenciales WiFi: fuera del código (secrets.h, excluido de git).
+// Copiar secrets.example.h como secrets.h y completar los valores.
+#include "secrets.h"
+const char* ssid = SECRET_AP_SSID;
+const char* password = SECRET_AP_PASSWORD;
+
+// ÚNICA línea que se edita en cada cubo: su NÚMERO (1 a 10), el mismo que
+// lleva su etiqueta. Antes se editaba el último octeto de la IP a mano
+// (cubo 1 = .2 ... cubo 10 = .11), y un desfase de uno o un cubo repetido
+// dejaba cubos con la identidad cambiada. Al arrancar, el cubo parpadea en
+// blanco ese número de veces para comprobar que quedó bien cargado.
+const int NUMERO_CUBO = 10;
+static_assert(NUMERO_CUBO >= 1 && NUMERO_CUBO <= 10, "NUMERO_CUBO debe estar entre 1 y 10");
+const bool ANUNCIAR_NUMERO_AL_ARRANCAR = true;
+IPAddress local_IP(192, 168, 4, NUMERO_CUBO + 1);
+IPAddress gateway(192,168,4,1);
+IPAddress subnet(255,255,255,0);
+
+WiFiServer server(3333);
+WiFiClient cliente;          // conexión persistente con el maestro
+String bufferEntrada = "";
+
+//definicion de constantes y variables
+const int Freq_max = 900;
+String id_caja;
+
+// --- estado del parpadeo no bloqueante ---
+String colorR = "0", colorG = "0", colorB = "0";
+unsigned long medioPeriodoMs = 0;   // 0 = color fijo, sin parpadeo
+unsigned long ultimoToggleLed = 0;
+bool ledEncendidoAhora = false;
+
+// --- color de equipo por defecto (derivado de local_IP, sin config extra) ---
+// El último octeto de local_IP ya es único por cubo (192.168.4.2..11 =
+// cubos 1..10, obligatorio configurarlo al flashear cada uno). id<=5 =
+// equipo A (azul), igual que teamAColor/teamBColor en App.tsx del frontend.
+int colorEquipoR = 0, colorEquipoG = 0, colorEquipoB = 255;
+
+// --- color de "sin WiFi / reconectando": magenta ---
+// Antes era rojo fijo (255,0,0), idéntico al color del equipo B: un cubo
+// rojo desconectado no se distinguía de uno rojo conectado y bien. Magenta
+// no lo usa ningún otro estado (equipos azul/rojo, PPA celeste/amarillo/
+// verde, inválido naranja, bloqueo/victoria que terminan en blanco).
+// Decisión del autor, 2026-09-18.
+const int COLOR_DESC_R = 255, COLOR_DESC_G = 0, COLOR_DESC_B = 255;
+
+// --- identificación por el canal de posición (2026-10-15) ---
+// La base solo lee presencia (1/0) en cada casilla, no QUÉ cubo está ahí.
+// Para identificarlo, el maestro le manda "ID=0" a un cubo concreto (por su
+// IP); el cubo baja su pin de presencia (Pfcaja) un instante y el maestro
+// mira qué casilla pasó a 0: esa es la casilla de ese cubo. Se restaura
+// solo a HIGH pasado IDENT_PULSO_MS, aunque el "ID=1" se pierda — un cubo
+// nunca puede quedarse "invisible" para la base por un mensaje perdido.
+const unsigned long IDENT_PULSO_MS = 250;
+bool identPulsoActivo = false;
+unsigned long identPulsoInicio = 0;
+
+// --- Telemetría hacia el maestro (2026-10-16) ---
+// Cada TELEMETRIA_MS el cubo manda por el mismo socket una línea
+// "EST=<bateria_mV>,<rssi_dBm>,<motivo_reinicio>,<segundos_encendido>".
+//  - Batería: el ESP32-C3 SuperMini NO puede medirla solo. Requiere un
+//    divisor de dos resistencias iguales (100 kΩ + 100 kΩ) desde el
+//    positivo de la batería a GND, con el punto medio en BATERIA_PIN.
+//    Sin el divisor el pin queda al aire y la lectura salta: se detecta por
+//    su dispersión y se informa -2 ("sin medición"), nunca un valor falso.
+//    BATERIA_PIN = -1 desactiva la medición (se informa -1).
+//  - Motivo del último reinicio (esp_reset_reason): 9 = ESP_RST_BROWNOUT,
+//    caída de voltaje — la señal más clara de batería agotada, sin hardware.
+//  - Señal WiFi (RSSI): un cubo lejos del maestro o con poca batería pierde
+//    señal antes de desconectarse.
+// DESACTIVADA (2026-10-16, decisión del autor): los cubos no se modifican en
+// esta versión. Para una próxima versión: soldar el divisor y poner aquí 1
+// (ADC1_CH1 del ESP32-C3, libre en este cubo); Control mostrará la batería
+// sola, sin más cambios.
+const int   BATERIA_PIN       = -1;
+const float BATERIA_DIVISOR   = 2.0;    // 100 kΩ / 100 kΩ
+const int   BATERIA_DISPERSION_MAX_MV = 250;
+const unsigned long TELEMETRIA_MS = 5000;
+unsigned long ultimaTelemetria = 0;
+int motivoReinicio = 0;
+
+// --- Enlace con el maestro (2026-10-22) ---
+// El maestro manda "PG=<n>" cada ~2 s a cada cubo y este contesta "PO=<n>":
+// así se mide la latencia real maestro<->cubo y se detecta una conexión
+// "zombi". Si pasan SILENCIO_MAESTRO_MS sin recibir NADA del maestro, la
+// conexión se da por muerta y se cierra para poder aceptar la siguiente.
+// (Sin esto, tras reiniciar el maestro la conexión vieja quedaba "viva" para
+// el cubo, que nunca atendía la nueva: había que reiniciar todo.)
+// IMPORTANTE: requiere el Maestro_v3 actualizado (es el que manda los PG);
+// con el maestro anterior este tiempo cortaría conexiones sanas. Cargar ambos.
+const unsigned long SILENCIO_MAESTRO_MS = 9000;
+unsigned long ultimoDatoMaestro = 0;
+
+// --- motor de efectos no bloqueante (EF=<n>): secuencias de color y
+// vibración de varios pasos que corren enteramente en el cubo, sin
+// depender de que el frontend mande varios comandos seguidos. r=-1 en un
+// paso significa "usar el color de equipo actual" (colorEquipoR/G/B).
+// durMs=0 en un paso significa "mantener para siempre" (paso final).
+struct PasoEfecto { int r, g, b; float vib; unsigned long durMs; };
+
+const PasoEfecto EFECTO_1_CONEXION_BACK[]  = { {0, 240, 255, 0.0, 3000}, {-1, 0, 0, 0.0, 0} };
+const PasoEfecto EFECTO_2_CONEXION_FRONT[] = { {176, 38, 255, 0.0, 3000}, {-1, 0, 0, 0.0, 0} };
+const PasoEfecto EFECTO_3_INVALIDO[]       = { {255, 140, 0, 0.7, 1000}, {-1, 0, 0, 0.0, 0} };
+const PasoEfecto EFECTO_4_BLOQUEO[]        = {
+  {255, 0, 0, 0.90, 500}, {255, 0, 0, 0.65, 500}, {255, 0, 0, 0.40, 500}, {255, 0, 0, 0.15, 500},
+  {255, 255, 255, 0.0, 0},
+};
+const PasoEfecto EFECTO_5_VICTORIA[]       = {
+  {0, 255, 0, 0.6, 400}, {255, 215, 0, 0.6, 400}, {0, 255, 0, 0.6, 400}, {255, 215, 0, 0.6, 400},
+  {255, 255, 255, 0.0, 0},
+};
+const PasoEfecto EFECTO_6_CUENTA_TICK[]    = { {0, 255, 255, 0.0, 300}, {-1, 0, 0, 0.0, 0} };
+const PasoEfecto EFECTO_7_CUENTA_INICIA[]  = { {0, 255, 0, 0.0, 300}, {-1, 0, 0, 0.0, 0} };
+
+const PasoEfecto* efectoPasos    = nullptr;
+int   efectoNumPasos             = 0;
+int   efectoPasoActual           = 0;
+unsigned long efectoInicioPaso   = 0;
+bool  efectoActivo               = false;
+
+// definición de funciones
+
+// Aplica un color sólido de inmediato (sin parpadeo), útil para el
+// estado de "desconectado" o justo al reconectar.
+void setColorSolid(int r, int g, int b) {
+  efectoActivo = false; // un comando normal cancela cualquier efecto EF= en curso
+  analogWrite(Rpin, r);
+  analogWrite(Gpin, g);
+  analogWrite(Bpin, b);
+  medioPeriodoMs = 0;
+}
+
+// Aplica la vibración de un paso de efecto directamente desde un float
+// (0.0 = motor apagado), sin pasar por confi_vibromotor(String) para
+// evitar el redondeo de String(float) al comparar contra "0.0".
+// Un motor de vibración de moneda no arranca con un PWM bajo estando
+// quieto: con el 45 % de Pausar (PWM 142 de 255) solo zumbaba o no se sentía.
+// Dos cambios (2026-10-22, prueba con los cubos reales):
+//  - Arranque: 80 ms a plena potencia al pasar de apagado a encendido.
+//  - Piso: toda vibración encendida va entre VIB_PISO y 100 % del PWM, en
+//    proporción a la intensidad pedida (0,45 -> 75 %; 0,80 -> 91 %). Se
+//    conservan las diferencias entre Pausar/Pensar/Actuar, pero siempre por
+//    encima de lo que el motor necesita para sentirse.
+const float VIB_PISO = 0.55f;
+const unsigned long VIB_ARRANQUE_MS = 80;
+bool motorEncendido = false;
+unsigned long vibArranqueHasta = 0;
+int vibPwmObjetivo = 0;
+
+void aplicarVibracion(float v) {
+  if (v <= 0.0f) {
+    analogWrite(motorpin, 0);
+    motorEncendido = false;
+    vibArranqueHasta = 0;
+    return;
+  }
+  if (v > 1.0f) v = 1.0f;
+  vibPwmObjetivo = (int)((VIB_PISO + (1.0f - VIB_PISO) * v) * 255.0f);
+  if (!motorEncendido) {
+    analogWrite(motorpin, 255);                    // arranque a plena potencia
+    vibArranqueHasta = millis() + VIB_ARRANQUE_MS;
+  } else if (vibArranqueHasta == 0) {
+    analogWrite(motorpin, vibPwmObjetivo);
+  }
+  motorEncendido = true;
+}
+
+// Termina el arranque a plena potencia y deja el PWM de régimen. No bloquea.
+void actualizarVibracion() {
+  if (vibArranqueHasta != 0 && millis() >= vibArranqueHasta) {
+    analogWrite(motorpin, vibPwmObjetivo);
+    vibArranqueHasta = 0;
+  }
+}
+
+// --- Patrón de vibración por fase (VP=<n>, 2026-11-20) ---------------------
+// Tramos alternados encendido/apagado en ms, empezando encendido; el ciclo
+// se repite mientras dure la señal. Mismos tiempos que el sonido de la fase.
+const unsigned int VP_PAUSAR[] = { 550, 350, 550, 1200 };          // dos pulsos largos
+const unsigned int VP_PENSAR[] = { 150, 150, 150, 150, 150, 650 }; // tres pulsos cortos
+int vibPatron = 0;               // 0 = continua
+float vibPatronIntensidad = 0.0f;
+unsigned long vibPatronInicio = 0;
+bool vibPatronEncendido = false;
+
+void detenerPatronVibracion() {
+  vibPatron = 0;
+  vibPatronEncendido = false;
+}
+
+void iniciarPatronVibracion(int patron, float intensidad) {
+  vibPatron = patron;
+  vibPatronIntensidad = intensidad;
+  vibPatronInicio = millis();
+  vibPatronEncendido = true;
+  aplicarVibracion(intensidad);  // el primer tramo siempre es encendido
+}
+
+void actualizarPatronVibracion() {
+  if (vibPatron == 0) return;
+  const unsigned int* tramos = (vibPatron == 1) ? VP_PAUSAR : VP_PENSAR;
+  int n = (vibPatron == 1) ? 4 : 6;
+  unsigned long ciclo = 0;
+  for (int i = 0; i < n; i++) ciclo += tramos[i];
+  unsigned long t = (millis() - vibPatronInicio) % ciclo;
+  bool encendido = false;
+  unsigned long acum = 0;
+  for (int i = 0; i < n; i++) {
+    acum += tramos[i];
+    if (t < acum) { encendido = (i % 2 == 0); break; }
+  }
+  if (encendido != vibPatronEncendido) {
+    vibPatronEncendido = encendido;
+    aplicarVibracion(encendido ? vibPatronIntensidad : 0.0f);
+  }
+}
+
+void aplicarPasoEfecto(int i) {
+  const PasoEfecto &p = efectoPasos[i];
+  int r = p.r, g = p.g, b = p.b;
+  if (r == -1) { r = colorEquipoR; g = colorEquipoG; b = colorEquipoB; }
+  analogWrite(Rpin, r);
+  analogWrite(Gpin, g);
+  analogWrite(Bpin, b);
+  aplicarVibracion(p.vib);
+  efectoInicioPaso = millis();
+  Serial.printf("  paso %d/%d -> RGB(%d,%d,%d) vib=%.2f dur=%lums\n", i + 1, efectoNumPasos, r, g, b, p.vib, p.durMs);
+}
+
+// Arranca una de las secuencias enlatadas (EF=1..7). Cancela cualquier
+// parpadeo en curso; un comando normal posterior (M=... o restaurar)
+// cancela el efecto a su vez (ver setColorSolid/actualizarColorObjetivo).
+void iniciarEfecto(int numero) {
+  Serial.printf("EF=%d recibido\n", numero);
+  detenerPatronVibracion();
+  const PasoEfecto* tabla = nullptr;
+  int n = 0;
+  switch (numero) {
+    case 1: tabla = EFECTO_1_CONEXION_BACK;  n = 2; break;
+    case 2: tabla = EFECTO_2_CONEXION_FRONT; n = 2; break;
+    case 3: tabla = EFECTO_3_INVALIDO;       n = 2; break;
+    case 4: tabla = EFECTO_4_BLOQUEO;        n = 5; break;
+    case 5: tabla = EFECTO_5_VICTORIA;       n = 5; break;
+    case 6: tabla = EFECTO_6_CUENTA_TICK;    n = 2; break;
+    case 7: tabla = EFECTO_7_CUENTA_INICIA;  n = 2; break;
+    default:
+      Serial.println("  numero de efecto desconocido, se ignora");
+      return;
+  }
+  efectoPasos      = tabla;
+  efectoNumPasos   = n;
+  efectoPasoActual = 0;
+  efectoActivo     = true;
+  medioPeriodoMs   = 0; // cancela cualquier parpadeo en curso
+  aplicarPasoEfecto(0);
+}
+
+// Avanza la secuencia según el tiempo transcurrido. No bloquea nunca;
+// se llama en cada vuelta de loop(), igual que actualizarParpadeo().
+void actualizarEfecto() {
+  if (!efectoActivo) return;
+  const PasoEfecto &actual = efectoPasos[efectoPasoActual];
+  if (actual.durMs == 0) return; // paso final: se mantiene para siempre
+  if (millis() - efectoInicioPaso >= actual.durMs) {
+    efectoPasoActual++;
+    if (efectoPasoActual >= efectoNumPasos) { efectoActivo = false; return; }
+    aplicarPasoEfecto(efectoPasoActual);
+  }
+}
+
+// Define el color/frecuencia objetivo del parpadeo. No bloquea: solo
+// arma la máquina de estados que actualizarParpadeo() avanza en cada
+// vuelta de loop().
+void actualizarColorObjetivo(String Led_r, String Led_g, String Led_b, String freq) {
+  efectoActivo = false; // un comando normal cancela cualquier efecto EF= en curso
+  colorR = Led_r;
+  colorG = Led_g;
+  colorB = Led_b;
+  Serial.println("actualizarColorObjetivo: LR=" + Led_r + " LG=" + Led_g + " LB=" + Led_b + " F=" + freq);
+
+  float f = freq.toFloat();
+  medioPeriodoMs = (unsigned long)(Freq_max * f);
+
+  if (medioPeriodoMs == 0) {
+    // frecuencia 0 = color fijo, sin parpadeo
+    analogWrite(Rpin, colorR.toInt());
+    analogWrite(Gpin, colorG.toInt());
+    analogWrite(Bpin, colorB.toInt());
+    return;
+  }
+
+  ultimoToggleLed = millis();
+  ledEncendidoAhora = true;
+  analogWrite(Rpin, colorR.toInt());
+  analogWrite(Gpin, colorG.toInt());
+  analogWrite(Bpin, colorB.toInt());
+}
+
+// Avanza el parpadeo según el tiempo transcurrido. Se debe llamar en
+// cada vuelta de loop(); nunca usa delay().
+void actualizarParpadeo() {
+  if (medioPeriodoMs == 0) return; // color fijo, nada que alternar
+  if (millis() - ultimoToggleLed >= medioPeriodoMs) {
+    ultimoToggleLed = millis();
+    ledEncendidoAhora = !ledEncendidoAhora;
+    if (ledEncendidoAhora) {
+      analogWrite(Rpin, colorR.toInt());
+      analogWrite(Gpin, colorG.toInt());
+      analogWrite(Bpin, colorB.toInt());
+    } else {
+      analogWrite(Rpin, 0);
+      analogWrite(Gpin, 0);
+      analogWrite(Bpin, 0);
+    }
+  }
+}
+
+//Función para configurar la intensidad de vibración del motor
+void confi_vibromotor(String I_motor){
+  aplicarVibracion(I_motor.toFloat());
+}
+
+// Función genérica para extraer valores
+String extraerValor(const String &data, const String &clave) {
+  int start = data.indexOf(clave) + clave.length();
+  int end = data.indexOf(',', start);
+  if (end == -1) end = data.length(); // Último campo
+  return data.substring(start, end);
+}
+
+int leerBateriaMv() {
+  if (BATERIA_PIN < 0) return -1;
+  int minimo = 100000, maximo = 0;
+  long suma = 0;
+  for (int i = 0; i < 8; i++) {
+    int mv = analogReadMilliVolts(BATERIA_PIN);
+    suma += mv;
+    if (mv < minimo) minimo = mv;
+    if (mv > maximo) maximo = mv;
+  }
+  if (maximo - minimo > BATERIA_DISPERSION_MAX_MV) return -2; // pin al aire: sin divisor
+  return (int)((suma / 8) * BATERIA_DIVISOR);
+}
+
+void enviarTelemetria() {
+  if (!cliente.connected()) return;
+  if (ultimaTelemetria != 0 && millis() - ultimaTelemetria < TELEMETRIA_MS) return;
+  ultimaTelemetria = millis();
+  char linea[80];
+  // Último campo: los 3 últimos bytes de la MAC del chip. Identifica de forma
+  // única el dispositivo físico detrás de cada IP: si dos cubos se cargaron
+  // con la misma IP, o se cambió un cubo, el maestro lo ve.
+  uint64_t mac = ESP.getEfuseMac();
+  snprintf(linea, sizeof(linea), "EST=%d,%d,%d,%lu,%06lX\n", leerBateriaMv(), (int)WiFi.RSSI(), motivoReinicio,
+           millis() / 1000, (unsigned long)((mac >> 24) & 0xFFFFFF));
+  cliente.print(linea);
+}
+
+void iniciarPulsoIdentificacion() {
+  digitalWrite(Pfcaja, LOW);
+  identPulsoActivo = true;
+  identPulsoInicio = millis();
+}
+
+void actualizarPulsoIdentificacion() {
+  if (identPulsoActivo && millis() - identPulsoInicio >= IDENT_PULSO_MS) {
+    digitalWrite(Pfcaja, HIGH);
+    identPulsoActivo = false;
+  }
+}
+
+void procesarLinea(const String &cadena) {
+  // Los PG llegan cada 2 s por cubo: no se imprimen para no llenar el Monitor.
+  if (!cadena.startsWith("PG=")) Serial.println("Linea recibida: [" + cadena + "]");
+  if (cadena.startsWith("PG=")) {
+    // Ping del maestro: se contesta de inmediato con el mismo número.
+    cliente.print("PO=" + cadena.substring(3) + "\n");
+    return;
+  }
+  if (cadena == "ID=0") {
+    iniciarPulsoIdentificacion();
+    return;
+  }
+  if (cadena == "ID=1") {
+    digitalWrite(Pfcaja, HIGH);
+    identPulsoActivo = false;
+    return;
+  }
+  if (cadena.startsWith("EF=")) {
+    iniciarEfecto(cadena.substring(3).toInt());
+    return;
+  }
+
+  if (cadena == "restaurar") {
+    // "restaurar" lo dispara el frontend en CADA evento de posición del
+    // tablero (handleStateChange -> restaurarCubos), no solo cuando de
+    // verdad hay que apagar una señal PPA. Antes volvía a (0,0,0) (negro),
+    // así que cualquier cubo ya "modificado" (incluida la asignación
+    // rutinaria de color de equipo al conectar) se apagaba solo con que
+    // CUALQUIER cubo del tablero cambiara de posición. Corregido
+    // (2026-09-18, prueba con hardware real) para que "restaurar" vuelva
+    // al color de equipo del propio cubo, no a negro.
+    detenerPatronVibracion();
+    confi_vibromotor("0.0");
+    actualizarColorObjetivo(String(colorEquipoR), String(colorEquipoG), String(colorEquipoB), "0.0");
+    return;
+  }
+
+  String valor_motor = extraerValor(cadena, "M=");
+  String lr           = extraerValor(cadena, "LR=");
+  String lg           = extraerValor(cadena, "LG=");
+  String lb           = extraerValor(cadena, "LB=");
+  String freq         = extraerValor(cadena, "F=");
+
+  // Se compara como número, no como texto: el maestro formatea con "%.2f"
+  // ("0.00"), y confi_vibromotor() compara contra el texto "0.0" — nunca
+  // coincidían, así que el motor quedaba encendido a PWM 50 (~20%) cada vez
+  // que un cubo volvía a su color de equipo con vibración 0. Misma fórmula
+  // que antes para cualquier valor mayor que 0 (Pausar/Pensar/Actuar sin
+  // cambios).
+  // VP= es opcional (2026-11-20): se busca antes de leerlo, porque
+  // extraerValor() no distingue una clave ausente.
+  int patron = (cadena.indexOf("VP=") >= 0) ? extraerValor(cadena, "VP=").toInt() : 0;
+  float intensidad = valor_motor.toFloat();
+  if (intensidad > 0.0f && (patron == 1 || patron == 2)) {
+    iniciarPatronVibracion(patron, intensidad);
+  } else {
+    detenerPatronVibracion();
+    aplicarVibracion(intensidad);
+  }
+  actualizarColorObjetivo(lr, lg, lb, freq);
+}
+
+// Acepta/mantiene la conexión persistente del maestro y arma las
+// líneas recibidas byte a byte, sin ninguna llamada bloqueante.
+void procesarRed() {
+  // Una conexión nueva SIEMPRE reemplaza a la anterior (2026-10-22). Antes
+  // solo se atendía una nueva cuando la vieja ya figuraba cerrada; si el
+  // maestro se reiniciaba o perdía la red, la vieja seguía "viva" para el
+  // cubo (TCP no avisa), la nueva quedaba esperando sin que nadie la
+  // atendiera y el cubo parecía desconectado hasta reiniciar todo.
+  WiFiClient nuevo = server.available();
+  if (nuevo) {
+    cliente.stop();
+    cliente = nuevo;
+    cliente.setNoDelay(true); // sin retardo de Nagle: cada línea sale al instante
+    bufferEntrada = "";
+    ultimoDatoMaestro = millis();
+    ultimaTelemetria = 0;     // el maestro nuevo recibe la telemetría enseguida
+    Serial.println("Maestro conectado (nueva conexion aceptada en :3333)");
+  }
+  if (!cliente.connected()) return;
+
+  // Silencio prolongado = maestro caído sin avisar: se cierra para que la
+  // próxima conexión se acepte limpia.
+  if (millis() - ultimoDatoMaestro > SILENCIO_MAESTRO_MS) {
+    Serial.println("Sin datos del maestro: conexion zombi, se cierra");
+    cliente.stop();
+    return;
+  }
+
+  while (cliente.available()) {
+    ultimoDatoMaestro = millis();
+    char c = cliente.read();
+    if (c == '\n') {
+      procesarLinea(bufferEntrada);
+      bufferEntrada = "";
+    } else if (c != '\r') {
+      bufferEntrada += c;
+      if (bufferEntrada.length() > 128) bufferEntrada = ""; // basura, reiniciar
+    }
+  }
+}
+
+
+void setup() {
+
+  // Activado temporalmente para depurar por qué los comandos no se ven
+  // reflejados en el cubo (2026-09-18) — antes estaba comentado. No usa
+  // los mismos pines que el LED/motor (UART0 = GPIO20/21 en el
+  // ESP32-C3 SuperMini), así que no interfiere con nada.
+  Serial.begin(115200);
+  delay(200);
+  Serial.println("\n--- Cubo esclavo arrancando ---");
+  motivoReinicio = (int)esp_reset_reason();
+  Serial.printf("Motivo del reinicio: %d%s\n", motivoReinicio, motivoReinicio == ESP_RST_BROWNOUT ? " (caida de voltaje: bateria baja)" : "");
+  if (BATERIA_PIN >= 0) analogSetPinAttenuation(BATERIA_PIN, ADC_11db); // hasta ~3,1 V en el pin (4,2 V / 2 = 2,1 V)
+
+  // Color de equipo derivado del último octeto de local_IP (192.168.4.2
+  // al .11 = cubos 1 al 10; equipo A/azul si id<=5, igual que
+  // teamAColor/teamBColor en App.tsx del frontend).
+  int miIdFisico = local_IP[3] - 1;
+  if (miIdFisico <= 5) { colorEquipoR = 0;   colorEquipoG = 0; colorEquipoB = 255; }
+  else                 { colorEquipoR = 255; colorEquipoG = 0; colorEquipoB = 0;   }
+  Serial.printf("miIdFisico=%d  colorEquipo=(%d,%d,%d)\n", miIdFisico, colorEquipoR, colorEquipoG, colorEquipoB);
+
+  // Radio (2026-10-22):
+  //  - Sin ahorro de energía (setSleep(false)): con el modo por defecto el
+  //    chip duerme entre balizas y cada comando puede esperar 100-300 ms.
+  //  - Potencia de 11 dBm en vez de la máxima: el cubo está a menos de un
+  //    metro del maestro, y los picos de corriente del WiFi a plena potencia,
+  //    sumados al motor, hunden la batería de 180 mAh (caídas de tensión
+  //    registradas en la sesión del 2026-10-22).
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.setAutoReconnect(true);
+  WiFi.setTxPower(WIFI_POWER_11dBm);
+
+  // Configurar IP estática antes de conectarse
+  WiFi.config(local_IP, gateway, subnet);
+  Serial.printf("Cubo numero %d, IP %s\n", NUMERO_CUBO, local_IP.toString().c_str());
+  if (ANUNCIAR_NUMERO_AL_ARRANCAR) {
+    // N destellos blancos = soy el cubo N (compruébese contra la etiqueta).
+    for (int i = 0; i < NUMERO_CUBO; i++) {
+      analogWrite(Rpin, 255); analogWrite(Gpin, 255); analogWrite(Bpin, 255);
+      delay(180);
+      analogWrite(Rpin, 0); analogWrite(Gpin, 0); analogWrite(Bpin, 0);
+      delay(180);
+    }
+  }
+
+  conectarWifi();
+  server.begin();
+  pinMode(Pfcaja, OUTPUT);
+  digitalWrite(Pfcaja, HIGH);
+  Serial.println("Listo, esperando conexión del maestro en el puerto 3333...");
+}
+
+
+void loop() {
+
+  if (WiFi.status() != WL_CONNECTED) {
+    conex = false;
+    setColorSolid(COLOR_DESC_R, COLOR_DESC_G, COLOR_DESC_B);  // magenta = sin WiFi
+    detenerPatronVibracion();
+    confi_vibromotor("0.0");
+    conectarWifi();  // Reintenta solo si se perdió la conexión
+    return;
+  }
+
+  procesarRed();
+  enviarTelemetria();
+  actualizarPulsoIdentificacion();
+  actualizarEfecto();
+  actualizarParpadeo();
+  actualizarPatronVibracion();
+  actualizarVibracion();
+}
+
+void conectarWifi() {
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    setColorSolid(COLOR_DESC_R, COLOR_DESC_G, COLOR_DESC_B);
+    confi_vibromotor("0.0");
+    conex = false;
+    delay(500);
+  }
+
+  // Se asienta directo en su color de equipo (cubos 1-5 azul, 6-10 rojo,
+  // calculado en setup() desde local_IP). Requisito del autor (2026-10-15):
+  // el color de equipo debe verse siempre, sin depender de que el frontend
+  // esté abierto o de que una confirmación llegue — el naranja de "esperando
+  // confirmación" (2026-09-18) dejaba cubos sin color de equipo cada vez que
+  // esa confirmación se perdía. El frontend igual le reafirma el color
+  // vigente cuando lo ve conectado (pausa, bloqueo, etc.).
+  setColorSolid(colorEquipoR, colorEquipoG, colorEquipoB);
+  conex = true;
+}

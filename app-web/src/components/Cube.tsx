@@ -1,0 +1,175 @@
+import { PPA_HEX, PPA_VIBRATION, PPA_SOUND_LABEL, type PPAPhase } from '../core/ppa/ppaColors'
+
+type CubeAction = PPAPhase
+
+const ACTION_META: Record<CubeAction, {
+  bg: string; textColor: string; icon: string
+  vibLabel: string; vibLevel: number; soundLabel: string
+}> = {
+  pausar: {
+    bg: PPA_HEX.pausar, textColor: '#001a26',
+    icon: '⏸',
+    vibLabel: `${Math.round(PPA_VIBRATION.pausar * 100)}%`, vibLevel: PPA_VIBRATION.pausar,
+    soundLabel: PPA_SOUND_LABEL.pausar,
+  },
+  pensar: {
+    bg: PPA_HEX.pensar, textColor: '#1a1a00',
+    icon: '💡',
+    vibLabel: `${Math.round(PPA_VIBRATION.pensar * 100)}%`, vibLevel: PPA_VIBRATION.pensar,
+    soundLabel: PPA_SOUND_LABEL.pensar,
+  },
+  actuar: {
+    bg: PPA_HEX.actuar, textColor: '#001a0a',
+    icon: '⚡',
+    vibLabel: `${Math.round(PPA_VIBRATION.actuar * 100)}%`, vibLevel: PPA_VIBRATION.actuar,
+    soundLabel: PPA_SOUND_LABEL.actuar,
+  },
+}
+
+const VIB_HEIGHTS = [0.5, 0.9, 0.6, 1.0, 0.7]
+
+function Cube({
+  id,
+  isSelected,
+  onSelect,
+  isLegalTarget,
+  visual,
+}: {
+  id: number
+  isSelected: boolean
+  onSelect: (id: number) => void
+  // Casilla vacía a la que el cubo actualmente levantado SÍ puede bajar
+  // (resaltado en vivo, mismo criterio que ya usan las pestañas de
+  // Simulación — ver laEscaleraRules.legalMovesFor).
+  isLegalTarget?: boolean
+  // Único resultado del resolutor de estado visual (ver
+  // core/ppa/cubeVisualState.ts y ESTADO_VISUAL_CUBOS.md) — el mismo valor
+  // que decide qué comando físico se le manda a este cubo, así pantalla y
+  // cubo real nunca pueden discrepar. `accion`, si viene, muestra el mismo
+  // indicador (icono/barras de vibración/sonido) que antes solo aparecía
+  // para una señal PPA manual — ahora también para "pausado" (sesión), que
+  // físicamente es la misma señal.
+  visual: { hex: string; accion?: CubeAction; pulso?: true }
+}) {
+  const isEmpty = id === 0
+  const action  = visual.accion
+  const meta    = action ? ACTION_META[action] : null
+
+  const bgColor    = visual.hex
+  // Sobre blanco (fuera de lugar / pide reordenar) el número va oscuro.
+  const textColor  = meta ? meta.textColor : visual.hex.toLowerCase() === '#ffffff' ? '#161616' : '#fff'
+
+  // selection ring: white on action color, accent blue on default,
+  // verde-agua sobre casillas vacías que son un movimiento válido ahora
+  const LEGAL_TARGET_ACCENT = '#00e5a0'
+  const selRing = isSelected
+    ? `0 0 0 3px ${meta ? '#fff' : '#4fc3f7'}, 0 0 14px ${meta ? meta.bg + 'aa' : '#4fc3f7aa'}`
+    : visual.pulso
+      ? `0 0 0 3px ${visual.hex}, 0 0 16px ${visual.hex}aa`
+      : isLegalTarget
+        ? `0 0 0 3px ${LEGAL_TARGET_ACCENT}, 0 0 12px ${LEGAL_TARGET_ACCENT}aa`
+        : meta
+          ? `0 0 10px ${meta.bg}66`
+          : '0 2px 8px rgba(0,0,0,0.5)'
+
+  return (
+    <div
+      className={!isEmpty && action ? `cube-${action}` : undefined}
+      data-cubo={isEmpty ? undefined : id}
+      onClick={() => { if (!isEmpty) onSelect(id) }}
+      title={!isEmpty && action ? `Cubo #${id} — ${action.toUpperCase()}` : undefined}
+      style={{
+        width: '72px',
+        height: '80px',
+        borderRadius: '10px',
+        background: bgColor,
+        cursor: isEmpty ? 'default' : 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 4px 6px',
+        boxShadow: selRing,
+        transition: 'background 0.4s ease, box-shadow 0.2s ease',
+        position: 'relative',
+        userSelect: 'none',
+        flexShrink: 0,
+      }}
+    >
+      {/* ── Number ── */}
+      <span style={{
+        fontSize: '20px',
+        fontWeight: 700,
+        color: textColor,
+        lineHeight: 1,
+        textShadow: meta ? 'none' : '0 1px 4px rgba(0,0,0,0.4)',
+      }}>
+        {isEmpty ? '' : id}
+      </span>
+
+      {/* ── Action indicator (visible only when action assigned) ── */}
+      {meta && !isEmpty ? (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '3px',
+          width: '100%',
+        }}>
+          {/* Vibration mini-bars */}
+          <div
+            className={`vib-${action}`}
+            style={{
+              display: 'flex',
+              gap: '2px',
+              alignItems: 'flex-end',
+              height: '14px',
+            }}
+          >
+            {VIB_HEIGHTS.map((h, i) => (
+              <div
+                key={i}
+                style={{
+                  width: '4px',
+                  borderRadius: '1px',
+                  background: meta.textColor === '#fff'
+                    ? 'rgba(255,255,255,0.75)'
+                    : 'rgba(0,0,0,0.45)',
+                  height: `${Math.max(h * meta.vibLevel * 100, 15)}%`,
+                  transition: 'height 0.3s',
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Action label row: icon + sound */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '0 2px',
+          }}>
+            <span style={{ fontSize: '11px' }}>{meta.icon}</span>
+            <span style={{
+              fontSize: '9px',
+              fontWeight: 600,
+              color: meta.textColor === '#fff'
+                ? 'rgba(255,255,255,0.85)'
+                : 'rgba(0,0,0,0.6)',
+              letterSpacing: '0.02em',
+            }}>
+              {meta.soundLabel}
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* Empty placeholder to keep height consistent */
+        <div style={{ height: '34px' }} />
+      )}
+    </div>
+  )
+}
+
+export type { CubeAction }
+export default Cube

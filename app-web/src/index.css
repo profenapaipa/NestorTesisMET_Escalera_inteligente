@@ -1,0 +1,218 @@
+@import "tailwindcss";
+
+/* Tipografía autohospedada — sin llamada a red en tiempo de ejecución
+   (antes: Google Fonts vía <link> en index.html). Regla dura #5. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+
+/* ── Design System v4 — "consola neurocientífica" ───────────────────────────
+   v2 ("monitor clínico") tenía la estructura ordenada correcta — paneles
+   delimitados, tipografía sans, franjas claras — pero se sentía genérica
+   (ícono-en-círculo, sin identidad propia). v3 (editorial/serif) corrigió
+   la identidad pero perdió el orden: el usuario prefirió la estructura de
+   v2. v4 retoma los paneles delimitados de v2 y les suma la identidad real
+   del proyecto — no genérica: trazo EEG (el propio instrumento de la
+   tesis), glifos de señal neuronal por fase PPA en vez de íconos de
+   librería, marcadores tipo electrodo para los cubos conectados. IBM Plex
+   (Sans/Mono) en vez de un sans genérico: familia diseñada originalmente
+   para documentación técnica/científica global, no una serif editorial. */
+@theme {
+  /* Base — grafito frío, la que ya funcionaba en v2 */
+  --color-bg: #0B0F10;
+  --color-panel: #12181A;
+  --color-line: #232C2F;
+  --color-line-strong: #3A464A;
+
+  --color-paper: #E7EDEE;
+  --color-paper-dim: #9FB0B3;
+  --color-paper-faint: #647275;
+
+  /* Marca — azul/rojo de los dos equipos del juego, tomados de la paleta
+     de IBM Carbon Design System (Blue 50 / Red 50): coherente a propósito
+     con IBM Plex, la familia tipográfica ya elegida — mismo sistema de
+     diseño, no dos decisiones sueltas. Reemplaza los tonos web-primarios
+     (#2A6DF5/#F5433A) y el naranja de acento heredado de AppShell.tsx
+     (#d97706), que no armonizaban entre sí. Los cubos físicos (Cube.tsx)
+     siguen mostrando el azul/rojo real del hardware — esto es solo el
+     acento de la interfaz alrededor de ellos. */
+  --color-blue: #4589FF;
+  --color-red: #FA4D56;
+
+  /* Los 3 colores PPA NO se repiten aquí: fuente única en
+     core/ppa/ppaColors.ts (PPA_HEX/PPA_TEXT/PPA_RGB). */
+
+  /* Conectado/desconectado — verde/rojo estándar (también de Carbon:
+     Green 40 / Red 50, este último el mismo que --color-red), igual para
+     el maestro, los cubos esclavos y cualquier otro estado de conexión
+     física. Un solo rojo en todo el sistema, no dos casi iguales. */
+  --color-online: #42BE65;
+  --color-offline: #FA4D56;
+
+  /* Único uso: la cuenta regresiva de Iniciar intento, que se pidió que
+     cambiara de colores "como un semáforo" (rojo/amarillo/verde) — Yellow
+     30 del mismo Carbon Design System que ya da los otros 3 acentos
+     (Blue 50, Red 50, Green 40), no un amarillo suelto de otra paleta. */
+  --color-caution: #F1C21B;
+
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --radius: 3px; /* discreto — ni caja hiperredondeada ni brutalismo a 0 */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+}
+
+/* Único uso de animación en todo el rediseño — un destello que recorre el
+   trazo EEG del encabezado (App.tsx EegTrace) cada ~7s, no un loop
+   constante: pedido explícito para darle vida al elemento de identidad sin
+   caer en la decoración gratuita que el resto del sistema evita a
+   propósito. stroke-dasharray/offset usan pathLength=100 en el propio
+   <polyline>, así el 12/-12 de abajo es un porcentaje fijo del trazo,
+   sin importar su longitud geométrica real. */
+@keyframes eeg-sweep {
+  0%, 65%   { stroke-dasharray: 12 88; stroke-dashoffset: 112; opacity: 0; }
+  68%       { opacity: 1; }
+  85%       { stroke-dasharray: 12 88; stroke-dashoffset: -12; opacity: 1; }
+  88%, 100% { stroke-dasharray: 12 88; stroke-dashoffset: -12; opacity: 0; }
+}
+
+/* Mesa de trabajo de las pestañas de Simulación: tablero y controles a la
+   izquierda, grafo de estados a la derecha. En pantallas anchas ambas
+   columnas caben en la altura de la ventana (el grafo se queda a la vista
+   mientras se juega); en pantallas angostas se apilan. --bench-offset es lo
+   que ocupan, por encima del grafo, las pestañas, el encabezado y la franja
+   de configuración. */
+.sim-bench { display: flex; flex-direction: column; gap: 12px; }
+.sim-bench__cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.sim-bench__left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sim-bench__right { min-width: 0; height: 520px; }
+@media (min-width: 1100px) {
+  .sim-bench__cols { grid-template-columns: minmax(440px, 5fr) minmax(0, 6fr); }
+  .sim-bench__right {
+    position: sticky; top: 0;
+    height: max(480px, calc(100dvh - var(--bench-offset, 250px)));
+  }
+}
+/* Franja de configuración: campos en fila, se parte en varias líneas si no caben. */
+.sim-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 28px; }
+
+/* Animaciones de las reglas del tutorial (RulesAnimation): sacudida de la
+   ficha cuando la jugada NO es válida, y salto en arco cuando es un salto. */
+@keyframes demo-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+@keyframes demo-hop {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(-16px); }
+}
+.demo-shake { animation: demo-shake 0.45s ease-in-out; outline: 3px solid var(--tono-demo, var(--color-offline)); outline-offset: 1px; }
+.demo-hop { animation: demo-hop 0.65s ease-in-out; }
+/* Confirmación de la jugada correcta: un destello del color del acento
+   (verde) al llegar la ficha a la casilla. El error ya se comunica con la
+   sacudida y el naranja; esto es su contraparte. */
+@keyframes demo-ok {
+  0% { box-shadow: 0 0 0 0 var(--tono-demo, var(--color-online)); }
+  40% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--tono-demo, var(--color-online)) 35%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tono-demo, var(--color-online)) 0%, transparent); }
+}
+.demo-ok { animation: demo-ok 0.7s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .demo-piece { transition: none !important; }
+  .demo-shake, .demo-hop, .demo-ok { animation: none; }
+}
+
+/* ── Superficie "documento" de los informes ─────────────────────────────────
+   Un informe no es otro panel de la consola: es el documento que se lee, se
+   descarga y se le muestra al tutor. Por eso se dibuja sobre papel blanco,
+   dentro de la aplicación oscura, como una hoja sobre la mesa — y así
+   destaca sin pelearse con la interfaz.
+   La armonía se conserva porque NO cambia la paleta, cambia el paso: los
+   mismos acentos de IBM Carbon que ya usa todo el sistema (Blue, Red, Green,
+   Yellow) en sus pasos para fondo claro (60/70) en vez de los de fondo
+   oscuro (40/50). Todo lo que vive dentro hereda estos valores por variable
+   CSS, así que paneles, tablas, chips y el propio grafo se adaptan solos sin
+   duplicar ni un estilo. */
+.doc {
+  --color-bg: #ffffff;
+  --color-panel: #f2f5f6;
+  --color-line: #dbe1e3;
+  --color-line-strong: #aeb9bc;
+  --color-paper: #0c1315;
+  --color-paper-dim: #455457;
+  --color-paper-faint: #6a787b;
+  --color-blue: #0f62fe;   /* Carbon Blue 60 */
+  --color-red: #da1e28;    /* Carbon Red 60 */
+  --color-online: #198038; /* Carbon Green 60 */
+  --color-offline: #da1e28;
+  --color-caution: #8e6a00; /* Carbon Yellow 70 — legible sobre blanco */
+  background: var(--color-bg);
+  color: var(--color-paper);
+}
+
+/* Ventana emergente de los informes: el fondo oscurece la consola y la hoja
+   queda centrada arriba, con su propio desplazamiento en el fondo (no dos
+   barras anidadas). */
+.modal-informe {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(3, 7, 8, 0.74);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 22px 18px; overflow-y: auto;
+}
+.modal-informe__hoja {
+  width: 100%; max-width: 1180px; border-radius: 5px;
+  box-shadow: 0 26px 72px rgba(0, 0, 0, 0.6);
+}
+@media (max-width: 760px) {
+  .modal-informe { padding: 0; }
+  .modal-informe__hoja { border-radius: 0; min-height: 100%; }
+}
+
+
+/* ── Celulares y pantallas angostas (2026-11-20) ───────────────────────────
+   La interfaz se diseñó para el computador del operador; estas reglas la
+   hacen usable en un celular sin cambiar la vista de escritorio. Van con
+   !important porque los componentes usan estilos en línea. */
+html, body { max-width: 100%; overflow-x: hidden; }
+@media (max-width: 900px) {
+  /* Dos columnas (contenido + barra lateral) → una sola, la lateral debajo. */
+  .dos-columnas { flex-direction: column !important; align-items: stretch !important; }
+  .dc-lateral { width: 100% !important; }
+}
+@media (max-width: 760px) {
+  /* Pestañas: una sola línea con desplazamiento propio, sin ensanchar la página. */
+  .barra-pestanas { overflow-x: auto; flex-wrap: nowrap !important; padding: 0 8px !important; scrollbar-width: thin; }
+  .barra-pestanas .pestana { white-space: nowrap; flex-shrink: 0; padding: 10px 10px 8px !important; letter-spacing: 0.04em !important; }
+  .modo-pestana { display: none !important; }
+  .acciones-pestana { margin-left: 8px !important; flex-shrink: 0; }
+  /* Márgenes de la página más ajustados. */
+  .marco-pagina { padding: 12px 12px !important; }
+}
+@media (max-width: 760px) {
+  /* Miniaturas del tutorial (11 casillas de 30 px): más pequeñas para caber. */
+  .mini-tablero { zoom: 0.72; }
+}
+@media (max-width: 760px) {
+  /* El menú de perfil vive dentro de la barra de pestañas, que se desplaza y
+     lo recortaba: en el celular se ancla a la ventana. */
+  .menu-perfil-desplegable { position: fixed !important; top: 50px !important; right: 8px !important; max-width: calc(100vw - 16px); }
+}

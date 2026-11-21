@@ -1,0 +1,83 @@
+name: Publicar la aplicación en GitHub Pages
+
+# Publica la interfaz (app-web) en GitHub Pages cada vez que se
+# empuja a la rama de trabajo. La aplicación no necesita servidor: las
+# pestañas de tutorial, simulación e informes funcionan solas, y Control Mago
+# de Oz aparece como «Desconectado» porque del otro lado no hay hardware.
+#
+# Para que esto funcione hay que marcar una vez, en el repositorio:
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+
+on:
+  push:
+    # Solo main: es la rama desde la que GitHub Pages permite publicar, y así
+    # empujar otra rama no cancela un despliegue en curso (la concurrencia de
+    # abajo cancela el anterior del mismo grupo).
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez; si llega otro empujón, se cancela el anterior.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app-web
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app-web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobaciones (tipos, estilo y auditorías del juego)
+        run: |
+          npx tsc -b
+          npx eslint src
+          npm run reglas:auditar
+          npm run grafo:verificar
+          npm run metricas:verificar
+          npm run caminos:verificar
+          npm run animaciones:verificar
+          npm run importacion:verificar
+          npm run ppa:verificar
+          npm run datos:verificar
+          python3 -I ../herramientas/probar_sincronizar_eeg.py
+
+      - name: Compilar
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+        with:
+          # Intenta activar Pages por su cuenta; si el repositorio no lo
+          # permite, hay que marcarlo una vez a mano en Settings → Pages.
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app-web/dist
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

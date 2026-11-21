@@ -1,0 +1,100 @@
+// Bitácora de sesión, según las decisiones registradas en
+// DECISIONES_PROYECTO.md (2026-09-01): marca de tiempo ISO 8601 con
+// milisegundos, exportable a CSV y a JSON; para cada evento de PPA se
+// registra la secuencia completa (sugerencia, motivo, decisión del
+// operador, motivo del descarte, activación efectiva); cada sesión lleva
+// el identificador del operador y la versión de configuración vigente;
+// toda sesión de simulación queda marcada como tal (esSimulacion) para no
+// poder confundirse con una sesión real.
+//
+// "Desconexiones" (uno de los mínimos pedidos en DECISIONES_PROYECTO.md)
+// no aplica aquí: la simulación no tiene cubos físicos que puedan
+// desconectarse.
+
+export type PPAPhase = 'pausar' | 'pensar' | 'actuar'
+
+export type BitacoraEventType =
+  | 'movimiento'
+  | 'falla'
+  | 'sugerencia_ppa'
+  | 'decision_ppa'
+  | 'victoria'
+  | 'derrota'
+  | 'reinicio'
+  // Tutorial por niveles y práctica con intentos numerados
+  | 'pista'
+  | 'deshacer'
+  | 'callejon_sin_salida'
+  | 'nivel_superado'
+  | 'intento_iniciado'
+  // El tablero queda jugable. Va aparte de `intento_iniciado` porque entre
+  // los dos puede haber una cuenta regresiva: es este instante, y no el
+  // otro, el origen de tiempos para medir la planificación.
+  | 'juego_listo'
+  // El operador fija o devuelve a la calibración el umbral de Actuar.
+  | 'ajuste_umbral'
+
+export type BitacoraEvent = {
+  timestamp: string
+  esSimulacion: true
+  operadorId: string
+  // Quién hace la simulación o el tutorial (puede no ser el operador: un
+  // estudiante, un familiar, alguien que está aprendiendo el juego).
+  participanteId: string
+  versionConfiguracion: string
+  pares: number
+  tipo: BitacoraEventType
+  detalle: string
+  fase?: PPAPhase
+  motivo?: string
+  decision?: 'confirmada' | 'descartada'
+  motivoDescarte?: string
+  activacionEfectiva?: boolean
+  // Si la activación vino de una sugerencia confirmada o de la iniciativa
+  // del operador (core/ppa/motorPpa.ts), la versión de la configuración PPA y,
+  // en un ajuste, el umbral de Actuar resultante (ms).
+  origen?: 'sugerencia' | 'iniciativa'
+  versionPpa?: string
+  umbralMs?: number | null
+  posiciones: (number | null)[]
+  // Qué regla se rompió en una falla (ver tutor.ts: ocupada, lejos,
+  // salto_propio, salto_hueco, borde) — antes la falla solo decía la posición.
+  errorTipo?: string
+  nivel?: number
+  intentoNum?: number
+  // ID (1-based) del estado en el grafo de Escalera.m tras este evento: permite
+  // reconstruir el recorrido de cada intento sobre el grafo del libro.
+  nodoGrafo?: number
+}
+
+export function nowIso(): string {
+  return new Date().toISOString()
+}
+
+export function toCsv(events: BitacoraEvent[]): string {
+  const cols: (keyof BitacoraEvent)[] = [
+    'timestamp', 'esSimulacion', 'operadorId', 'participanteId', 'versionConfiguracion', 'pares',
+    'tipo', 'detalle', 'fase', 'motivo', 'decision', 'motivoDescarte',
+    'activacionEfectiva', 'origen', 'versionPpa', 'umbralMs', 'posiciones', 'errorTipo', 'nivel', 'intentoNum', 'nodoGrafo',
+  ]
+  const esc = (v: unknown) => {
+    if (v === undefined || v === null) return ''
+    const s = Array.isArray(v) ? JSON.stringify(v) : String(v)
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  const header = cols.join(',')
+  const rows = events.map(ev => cols.map(c => esc(ev[c])).join(','))
+  return [header, ...rows].join('\n')
+}
+
+export function downloadFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
