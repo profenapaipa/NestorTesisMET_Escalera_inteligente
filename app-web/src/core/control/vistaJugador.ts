@@ -16,9 +16,12 @@ export type VistaJugadorSnapshot = {
   tiempo: string
   mostrarTiempo: boolean
   estado: SessionState
+  // Pausa por un problema del montaje (2026-11-22): el jugador ve un mensaje
+  // neutro, sin el color de Pausar. Ya no se envía cuántos cubos hay
+  // conectados: es diagnóstico del operador, no información del juego.
+  pausaTecnica: boolean
   intento: number
   baseConectada: boolean
-  conectados: number
   cuenta: number | null
   // Tablero al que hay que llevar los cubos (antes de iniciar, o tras una
   // jugada inválida), en ids por casilla de la ventana del nivel.

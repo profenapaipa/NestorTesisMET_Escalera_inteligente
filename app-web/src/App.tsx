@@ -211,6 +211,14 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   const [pruebaBase,     setPruebaBase]     = useState(false)
   const [guiaAbierta,    setGuiaAbierta]    = useState(false)
   const telemetriaRef    = useRef<Record<number, TelemetriaCubo>>({})
+  // Hora (Date.now) de la última lista esclavosConectados: con ella cada
+  // falla_movimiento anota qué tan vieja era la información de conexión
+  // (T-005, opción 1: marcar sin cambiar la clasificación).
+  const ultimaListaMsRef = useRef<number | null>(null)
+  // Pausa técnica en curso (ver pausarJuego). Solo tiene sentido con
+  // sessionState === 'pausado'; el efecto de abajo la apaga si se sale de
+  // la pausa por otro camino (Terminar, Reiniciar, reinicio del maestro).
+  const [pausaTecnica, setPausaTecnica] = useState(false)
   // Cambios de lo que lee cada casilla desde que se abrió Control: una casilla
   // que no cambia NUNCA mientras las demás sí es una casilla ciega (cableado).
   const transicionesRef  = useRef<number[]>(Array(11).fill(0))
@@ -222,6 +230,12 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // Hora real estimada (reloj del PC) del último cambio que reportó la base:
   // la usan los marcadores de jugada en vez de la hora de llegada.
   const tRealUltimoRef   = useRef<{ tReal: number; latencia: number } | null>(null)
+  // Maestro v4: última publicación aplicada, arranque observado y una
+  // identificación pendiente tras un reinicio.
+  const ultimaPublicacionRef = useRef<{ arranque: number; seq: number } | null>(null)
+  const arranqueObservadoRef = useRef<number | null>(null)
+  const reidentPendienteRef  = useRef(false)
+  const [maestroReiniciado, setMaestroReiniciado] = useState<number | null>(null)
   // Nombre del archivo de bitácora en el backend (una por sesión).
   const archivoSesionRef = useRef(`control_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
   if (sesion.perfil) archivoSesionRef.current = `${sesion.perfil.perfilId}_${sesion.perfil.sesionId}`
@@ -353,6 +367,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
       pausa_automatica: ['pausa_automatica', true], correccion_completada: ['correccion_completada', true],
       victoria: ['victoria', true], derrota: ['derrota', true],
       reinicio_manual: ['reinicio_manual', false], tablero_reordenado: ['tablero_reordenado', true],
+      pausa_tecnica: ['pausa_tecnica', false], fin_pausa_tecnica: ['fin_pausa_tecnica', false],
     }
     const mk = MARCADOR_DE[ev.tipo]
     if (mk) registrarMarcador(mk[0], ev.detalle, mk[1] ? 'tablero' : 'operador', mk[1])
@@ -461,7 +476,37 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
         detalle: data.connected ? 'La base física reporta conexión activa' : 'La base física reporta desconexión',
       })
     })
-    socket.on('actualizarPosiciones', (data: MarcaLatencia & { posiciones: number[]; presencia?: number[]; origen?: string; identificacion?: { completa: boolean; casillas: number[]; deducidas?: number } }) => {
+    // Maestro v4: un solo detector de reinicio. Lo alimentan el aviso del
+    // backend, el arranque vigente que manda al conectar (por si la pantalla
+    // estaba desconectada durante el reinicio: corrección T-003) y el arranque
+    // de cada publicación. La primera observación solo fija la referencia.
+    const observarArranque = (nuevo: number) => {
+      const previo = arranqueObservadoRef.current
+      arranqueObservadoRef.current = nuevo
+      if (previo === null || previo === nuevo) return
+      logCuboEvent({ tipo: 'maestro_reiniciado', detalle: `El maestro se reinició (arranque ${previo} → ${nuevo}): el orden de cubos que lleva puede no ser el real`, arranque: nuevo })
+      ultimaPublicacionRef.current = null
+      setMaestroReiniciado(Date.now())
+    }
+    socket.on('maestroReiniciado', (d: { anterior: number; arranque: number }) => {
+      if (arranqueObservadoRef.current === null) arranqueObservadoRef.current = d.anterior
+      observarArranque(d.arranque)
+    })
+    socket.on('arranqueVigente', (d: { arranque: number }) => observarArranque(d.arranque))
+    socket.on('actualizarPosiciones', (data: MarcaLatencia & { posiciones: number[]; presencia?: number[]; origen?: string; identificacion?: { completa: boolean; casillas: number[]; deducidas?: number }; arranque?: number; seq?: number; enlace?: { perdidos: number; faltanEnSalto?: number } }) => {
+      // Defensa adicional: dentro de un mismo arranque la secuencia solo
+      // crece; una publicación igual o anterior a la ya aplicada se ignora
+      // (T-003: recordar solo la última pareja dejaba pasar 1, 2, 1).
+      if (typeof data.seq === 'number' && typeof data.arranque === 'number') {
+        observarArranque(data.arranque)
+        const anterior = ultimaPublicacionRef.current
+        if (anterior && anterior.arranque === data.arranque && data.seq <= anterior.seq) return
+        ultimaPublicacionRef.current = { arranque: data.arranque, seq: data.seq }
+        const faltan = data.enlace?.faltanEnSalto ?? 0
+        if (faltan > 0) {
+          logCuboEvent({ tipo: 'enlace_perdidas', detalle: `Faltan ${faltan} publicación(es) de la base: secuencias ${data.seq - faltan} a ${data.seq - 1} (pendientes en total: ${data.enlace?.perdidos ?? faltan})`, arranque: data.arranque, seq: data.seq })
+        }
+      }
       if (Array.isArray(data.presencia)) {
         setPresencia([...data.presencia])
         const antes = presenciaAntesRef.current
@@ -500,6 +545,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
         // saber después si una casilla estaba ciega (como las 1 y 2 en la
         // sesión del 2026-10-22) o si fue el seguimiento el que falló.
         presencia: Array.isArray(data.presencia) ? [...data.presencia] : undefined,
+        arranque: data.arranque, seq: data.seq,
       })
       setSincronizado(true)
       SimDataReceived([...data.posiciones])
@@ -507,6 +553,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
     socket.on('esclavosConectados', (data: { esclavos: number[]; telemetria?: TelemetriaCubo[] }) => {
       const nuevos = data.esclavos ?? []
       const antes = esclavosRef.current
+      ultimaListaMsRef.current = Date.now()
       if (Array.isArray(data.telemetria)) {
         const prevTel = telemetriaRef.current
         const tel: Record<number, TelemetriaCubo> = {}
@@ -570,7 +617,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
     return () => {
       socket.off('connect', pedirEstado)
       socket.off('disconnect'); socket.off('baseStatus')
-      socket.off('actualizarPosiciones'); socket.off('esclavosConectados')
+      socket.off('actualizarPosiciones'); socket.off('esclavosConectados'); socket.off('maestroReiniciado'); socket.off('arranqueVigente')
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -815,7 +862,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
           // "Distinción entre cubo levantado y cubo desconectado"): un cambio
           // de posición que no corresponde a un movimiento legal no se
           // asume automáticamente como falla — primero se revisa la señal
-          // independiente de conectividad (esclavosConectados, cada 5s) del
+          // independiente de conectividad (esclavosConectados, cada 1 s en el maestro v3) del
           // cubo implicado. Si ese cubo no aparece conectado, se registra
           // como "no detectado" y NO se cuenta como falla.
           const cuboImplicado = prevSettled[fromIdx]
@@ -847,7 +894,16 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
                 texto: `El cubo #${cuboImplicado} pasó de la posición ${fromIdx + 1} a la ${toIdx + 1}, que no es un movimiento válido del juego. Devuélvelo y prueba otra ficha.`,
               })
             }
-            logCuboEvent({ tipo: 'falla_movimiento', detalle: `Movimiento inválido detectado: cubo #${cuboImplicado} de la posición ${fromIdx + 1} a la ${toIdx + 1}` }, tipoFalta)
+            // T-005, opción 1: la falla se cuenta igual, pero queda anotada la
+            // frescura de la información de conexión del cubo para el análisis.
+            const msLista = ultimaListaMsRef.current === null ? undefined : Date.now() - ultimaListaMsRef.current
+            const datoCubo = telemetriaRef.current[cuboImplicado]?.dato
+            const edadDato = typeof datoCubo === 'number' && datoCubo >= 0 && msLista !== undefined ? datoCubo + msLista : undefined
+            logCuboEvent({
+              tipo: 'falla_movimiento',
+              detalle: `Movimiento inválido detectado: cubo #${cuboImplicado} de la posición ${fromIdx + 1} a la ${toIdx + 1}`,
+              msDesdeListaCubos: msLista, edadDatoCuboMs: edadDato,
+            }, tipoFalta)
             motorPpaRef.current.registrarFalla(cuboImplicado)
             // Reacción física casi inmediata: el cubo implicado se pone
             // naranja y vibra por su cuenta (EF=3, un solo mensaje, sin ida
@@ -908,7 +964,9 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
       }
       lastSettledPositionsRef.current = positions
       setCubesData(originalCubes)
-      setPath(t => [...t, positions])
+      // Una copia del mismo tablero asentado no es otro movimiento (T-001:
+      // sumaba 2 al contador). Solo se agrega si cambió.
+      setPath(t => (t.length && t[t.length - 1].join(',') === positions.join(',') ? t : [...t, positions]))
       setGameState({ cubesPositions: [...positions], liftedCube: null, emptyPosition: null })
     }
     // Antes: socket.emit('restaurarCubos', 'restaurar') incondicional en
@@ -1032,6 +1090,9 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // base no responde (firmware anterior), a los 12 s se sigue con el orden
   // que lleva el maestro, avisándolo.
   function solicitarIdentificacion(modo: 'auto' | 'manual' | 'iniciar') {
+    // Una ronda a la vez: si ya hay una en curso, no se pisa su modo.
+    if (identTimerRef.current !== null) return
+    reidentPendienteRef.current = false
     setIdentificando(modo)
     socket.emit('identificarCubos')
     quitarTemporizador(identTimerRef.current)
@@ -1131,11 +1192,21 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // por-cubo) cualquier señal PPA manual que estuviera vigente — decisión
   // ya validada: la pausa global gana siempre, y al reanudar no se
   // restaura sola (ver reanudarJuego).
-  function pausarJuego() {
+  // `tecnica` (2026-11-22, decisión del autor): pausa por un problema del
+  // montaje, no pedagógica. Mismo estado 'pausado' (cronómetro detenido,
+  // misma señal a los cubos), pero se registra como pausa_tecnica en la
+  // bitácora de cubos y NO en la de mediación, y la vista del jugador
+  // muestra un mensaje neutro sin el color de Pausar.
+  function pausarJuego(tecnica = false) {
     if (sessionState !== 'jugando') return
     sessionAccumMsRef.current += Date.now() - sessionStartRef.current
-    logOperatorEvent({ cuboId: 0, fase: 'pausar', detalle: 'Operador pausó la partida (señal Pausar a los 10 cubos)' })
-    registrarMarcador('pausa_operador', 'Operador pausó la partida', 'operador')
+    if (tecnica) {
+      logCuboEvent({ tipo: 'pausa_tecnica', detalle: 'Operador detuvo el intento por un problema del montaje (pausa técnica, no es Pausar PPA)' })
+    } else {
+      logOperatorEvent({ cuboId: 0, fase: 'pausar', detalle: 'Operador pausó la partida (señal Pausar a los 10 cubos)' })
+      registrarMarcador('pausa_operador', 'Operador pausó la partida', 'operador')
+    }
+    setPausaTecnica(tecnica)
     setSessionState('pausado')
   }
 
@@ -1149,8 +1220,13 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
     sessionStartRef.current = Date.now()
     // El tiempo en pausa no es «tiempo sin mover» (auditoría A5).
     motorPpaRef.current.reanudarReloj()
-    logOperatorEvent({ cuboId: 0, fase: 'estado_inicial', detalle: 'Operador reanudó la partida' })
-    registrarMarcador('reanudar_operador', 'Operador reanudó la partida', 'operador')
+    if (pausaTecnica) {
+      logCuboEvent({ tipo: 'fin_pausa_tecnica', detalle: 'Operador reanudó el intento tras la pausa técnica' })
+    } else {
+      logOperatorEvent({ cuboId: 0, fase: 'estado_inicial', detalle: 'Operador reanudó la partida' })
+      registrarMarcador('reanudar_operador', 'Operador reanudó la partida', 'operador')
+    }
+    setPausaTecnica(false)
     setSessionState('jugando')
   }
 
@@ -1370,6 +1446,50 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   const firmaTablero = gameState.cubesPositions.join(',')
   // Reidentificar sirve (y hace falta) justo al reordenar tras un intento:
   // solo se bloquea mientras se juega o se cuenta.
+  // Maestro reiniciado (v4): fuera de un intento, los cubos se reidentifican
+  // solos cuando vuelven a conectarse; durante un intento solo se avisa y
+  // decide el operador (nada automático en medio de la partida).
+  useEffect(() => {
+    if (maestroReiniciado === null) return
+    // Una ronda de identificación en curso era del maestro anterior: se
+    // cancela para que su vencimiento no inicie un intento (T-004). Si el
+    // operador había pulsado Iniciar, decide de nuevo cuando vuelvan los cubos.
+    if (identTimerRef.current !== null) {
+      const eraIniciar = identificando === 'iniciar'
+      quitarTemporizador(identTimerRef.current)
+      identTimerRef.current = null
+      setIdentificando(null)
+      if (eraIniciar) {
+        reidentPendienteRef.current = false
+        setAvisoIdentificacion('El maestro se reinició mientras se preparaba el intento: se canceló. Cuando vuelvan los cubos, pulsa «Iniciar intento» otra vez.')
+        return
+      }
+    }
+    const st = sessionStateRef.current
+    if (st !== 'inactivo' && st !== 'bloqueado' && st !== 'victoria') {
+      reidentPendienteRef.current = false
+      setAvisoIdentificacion('El maestro se reinició durante el intento: el orden de cubos que lleva puede no ser el real. Al terminar, usa «Reidentificar cubos».')
+      return
+    }
+    setAvisoIdentificacion('El maestro se reinició: los cubos se identificarán en cuanto se reconecten.')
+    reidentPendienteRef.current = true
+  }, [maestroReiniciado])
+  // La identificación pendiente espera a la base conectada y a que dejen de
+  // llegar cubos (5 s sin cambios); se cancela si el operador ya identificó,
+  // inició un intento o la ronda está en curso.
+  useEffect(() => {
+    if (!reidentPendienteRef.current) return
+    if (identificando !== null) { reidentPendienteRef.current = false; return }
+    if (!isBaseConnected || esclavos.length === 0) return
+    const t = setTimeout(() => {
+      const st = sessionStateRef.current
+      if (!reidentPendienteRef.current || identTimerRef.current !== null) return
+      if (st !== 'inactivo' && st !== 'bloqueado' && st !== 'victoria') { reidentPendienteRef.current = false; return }
+      ultimaIdentMsRef.current = Date.now()
+      solicitarIdentificacion('auto')
+    }, 5000)
+    return () => clearTimeout(t)
+  }, [maestroReiniciado, identificando, isBaseConnected, esclavos.length])
   const puedeReidentificar = isBaseConnected && identificando === null
     && (sessionState === 'inactivo' || sessionState === 'bloqueado' || sessionState === 'victoria')
   useEffect(() => {
@@ -1476,15 +1596,18 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
     tiempo: sessionElapsedLabel,
     mostrarTiempo: tiempoJugador,
     estado: sessionState,
+    pausaTecnica: sessionState === 'pausado' && pausaTecnica,
     intento: intentoCount,
     baseConectada: isBaseConnected,
-    conectados: esclavos.length,
     cuenta: countdownTick,
     objetivo: objetivoOrden
       ? { celdas: objetivoOrden.slice(offVentana, offVentana + 2 * pares + 1), desubicados, motivo: sessionState === 'correccion' ? 'correccion' : 'orden' }
       : null,
     fin: controlStatus === 'victoria' ? 'victoria' : controlStatus === 'derrota' ? 'bloqueo' : null,
   }
+  // Si se sale de la pausa por otro camino (Terminar, Reiniciar, reinicio
+  // del maestro), la marca de pausa técnica no debe quedar colgada.
+  useEffect(() => { if (sessionState !== 'pausado' && pausaTecnica) setPausaTecnica(false) }, [sessionState, pausaTecnica])
   useEffect(() => {
     const json = JSON.stringify(vistaJugador)
     if (vistaJugadorRef.current?.json === json) return
@@ -1536,9 +1659,16 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
               {identificando === 'iniciar' ? 'Identificando cubos…' : forzarInicio ? 'Iniciar de todos modos' : 'Iniciar intento'}
             </button>
             {sessionState === 'pausado' ? (
-              <button onClick={reanudarJuego} style={sessionBtn(true, 'var(--color-blue)')}>Reanudar</button>
+              <button onClick={reanudarJuego} style={sessionBtn(true, 'var(--color-blue)')}>
+                {pausaTecnica ? 'Reanudar (fin de pausa técnica)' : 'Reanudar'}
+              </button>
             ) : (
-              <button onClick={pausarJuego} disabled={sessionState !== 'jugando'} style={sessionBtn(sessionState === 'jugando', 'var(--color-blue)')}>Pausar</button>
+              <>
+                <button onClick={() => pausarJuego()} disabled={sessionState !== 'jugando'} style={sessionBtn(sessionState === 'jugando', 'var(--color-blue)')}>Pausar</button>
+                <button onClick={() => pausarJuego(true)} disabled={sessionState !== 'jugando'}
+                  title="Detiene el intento por un problema del montaje (cubo caído, batería, cable). No es la fase Pausar de la mediación: queda aparte en la bitácora y el jugador ve un mensaje neutro."
+                  style={sessionBtn(sessionState === 'jugando', 'var(--color-blue)')}>Pausa técnica</button>
+              </>
             )}
             {/* Terminar: cierra el intento y lo GUARDA (interrumpido). Reiniciar lo descarta. */}
             <button

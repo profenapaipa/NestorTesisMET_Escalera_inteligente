@@ -36,6 +36,14 @@ export type EventoCuboTipo =
   // cubos conectados, estado leído, operador y participante), y si el
   // operador decidió iniciar de todos modos (2026-11-20).
   | 'verificacion_previa'
+  // Maestro v4 (2026-11-21): el maestro se reinició (arranque nuevo) y
+  // faltan publicaciones de posiciones (salto en la secuencia).
+  | 'maestro_reiniciado' | 'enlace_perdidas'
+  // Pausa técnica (2026-11-22): el operador detiene el intento por un
+  // problema del montaje (cubo caído, batería, cable). Va aquí y no en la
+  // bitácora de mediación, porque no es una fase PPA ni una decisión
+  // pedagógica; así no se confunde con «Pausar» en el análisis.
+  | 'pausa_tecnica' | 'fin_pausa_tecnica'
 
 export type EventoCubo = {
   timestamp: string
@@ -51,6 +59,20 @@ export type EventoCubo = {
   // Lo que lee cada casilla de la base (1 = algo apoyado). Solo para auditar
   // el canal de posición; no se exporta en el CSV.
   presencia?: number[]
+  // Maestro v4: arranque y número de secuencia de la publicación que originó
+  // el evento (permiten auditar copias y faltantes). Ausentes con el v3.
+  arranque?: number
+  seq?: number
+  // Solo en falla_movimiento (T-005, opción 1, decidida por el autor el
+  // 2026-11-22): qué tan fresca era la información de conexión del cubo
+  // implicado cuando se contó la falla. No cambia la clasificación; sirve
+  // para que el análisis filtre fallas dudosas (el cubo pudo estar ya
+  // desconectado sin que la lista lo supiera todavía).
+  //   msDesdeListaCubos: ms desde la última lista de cubos conectados.
+  //   edadDatoCuboMs: ms desde la última línea recibida de ese cubo (dato
+  //   del maestro + lo transcurrido desde la lista); ausente si no hay dato.
+  msDesdeListaCubos?: number
+  edadDatoCuboMs?: number
   // Agrupa las filas de un mismo intento de partida (Iniciar -> victoria/
   // bloqueo/reinicio). Ausente en eventos que no pertenecen a un intento
   // en curso (p. ej. señales de conexión antes de iniciar).
@@ -85,7 +107,7 @@ export type DecisionOperador = {
   intentoNum?: number
 }
 
-const EVENTO_CUBO_COLS: (keyof EventoCubo)[] = ['timestamp', 'pares', 'participanteId', 'operadorId', 'versionPpa', 'tipo', 'detalle', 'posiciones', 'nodoGrafo', 'intentoId', 'intentoNum']
+const EVENTO_CUBO_COLS: (keyof EventoCubo)[] = ['timestamp', 'pares', 'participanteId', 'operadorId', 'versionPpa', 'tipo', 'detalle', 'posiciones', 'nodoGrafo', 'intentoId', 'intentoNum', 'msDesdeListaCubos', 'edadDatoCuboMs']
 const DECISION_OPERADOR_COLS: (keyof DecisionOperador)[] = [
   'timestamp', 'pares', 'participanteId', 'operadorId', 'versionPpa', 'tipo', 'cuboId', 'fase', 'motivo', 'decision',
   'motivoDescarte', 'activacionEfectiva', 'origen', 'umbralMs', 'detalle', 'nodoGrafo', 'intentoId', 'intentoNum',

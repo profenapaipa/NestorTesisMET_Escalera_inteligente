@@ -2,7 +2,7 @@
 
 Herramienta híbrida físico-virtual del juego **La Escalera** (salto de la rana): un tablero de cubos inteligentes (ESP32) y una aplicación web. Las dos comparten el mismo motor de reglas, el grafo del espacio del problema en vivo, las métricas de trayectoria y un protocolo de mediación Pausar–Pensar–Actuar bajo control Mago de Oz.
 
-**Versión actual: 0.12.3** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
+**Versión actual: 0.13.0** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
 
 **Pruébala en el navegador, sin instalar nada:** https://profenapaipa.github.io/NestorTesisMET_Escalera_inteligente/
 
@@ -50,6 +50,7 @@ El software se ha desarrollado y mejorado por etapas. Cada informe, sesión y pa
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
 | **0.12.3** | 2026-11-21 | El juego al centro de la atención | Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado. |
 | **0.12.2** | 2026-11-21 | Logo oficial en la pestaña del navegador | La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular. |
 | **0.12.1** | 2026-11-21 | Textos sin montarse en celular y computador | Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse. |

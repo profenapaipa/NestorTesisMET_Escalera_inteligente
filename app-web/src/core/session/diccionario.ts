@@ -217,6 +217,8 @@ export const CODIGOS_DESCRIPCION: Record<string, string> = {
   deshacer: 'El participante deshace la última jugada (vistas en pantalla).',
   pista: 'El participante pide una pista (vistas en pantalla).',
   callejon_sin_salida: 'El participante entra en un callejón sin salida.',
+  pausa_tecnica: 'El operador detiene el intento por un problema del montaje (cubo, batería, cable). No es la fase Pausar de la mediación.',
+  fin_pausa_tecnica: 'Se reanuda el intento tras la pausa técnica.',
 }
 
 export const TABLA_CODIGOS: TablaDef = {

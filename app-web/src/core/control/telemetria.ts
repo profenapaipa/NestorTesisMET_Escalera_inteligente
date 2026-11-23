@@ -85,13 +85,22 @@ export function estadoEnlace(conectado: boolean, t: TelemetriaCubo | undefined):
 // hecho un cambio: ese tiempo también es parte de lo que se tarda en verse.
 export const ANTIRREBOTE_MS = 25
 
-export type MarcaLatencia = { edadMs?: number; rttMs?: number; tsBackend?: number }
+// tFisico (maestro v4): hora de la detección en el reloj del PC, calculada en
+// el backend con el reloj común; relojErrorMs, su error estimado.
+export type MarcaLatencia = { edadMs?: number; rttMs?: number; tsBackend?: number; tFisico?: number; relojErrorMs?: number | null }
 
 // Latencia estimada desde que el cubo se levantó/apoyó hasta que llega a
 // esta pantalla, y la hora real (reloj del PC) en que ocurrió. Supone que
 // backend y navegador corren en el mismo equipo (mismo reloj), que es como
 // se monta la sesión; si no, la parte "backend → pantalla" se descarta.
 export function estimarLatencia(m: MarcaLatencia, ahora = Date.now()): { totalMs: number; tReal: number } | null {
+  // Con reloj común (v4) la hora de la detección ya viene en el reloj del PC:
+  // basta restar el antirrebote. Se usa solo si da una latencia plausible.
+  if (typeof m.tFisico === 'number') {
+    const tReal = m.tFisico - ANTIRREBOTE_MS
+    const total = ahora - tReal
+    if (total >= 0 && total < 5000) return { totalMs: Math.round(total), tReal: Math.round(tReal) }
+  }
   if (typeof m.edadMs !== 'number' || typeof m.tsBackend !== 'number') return null
   const red = typeof m.rttMs === 'number' && m.rttMs > 0 ? m.rttMs / 2 : 0
   const backendAPantalla = ahora - m.tsBackend

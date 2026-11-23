@@ -5,7 +5,7 @@ import { ChevronDown, Info } from 'lucide-react'
 import ModalInforme, { Bloque } from '../informe/ModalInforme'
 import { CAMINOS, GUIA_VISTA, LIMITACIONES } from '../../core/guia'
 import { COMMIT_APP, VERSION_APP } from '../../core/version'
-import { HISTORIAL_VERSIONES } from '../../core/versiones'
+import HistorialVersiones from './HistorialVersiones'
 
 function leer(clave: string, defecto: boolean): boolean {
   try { const v = localStorage.getItem(clave); return v === null ? defecto : v === '1' } catch { return defecto }
@@ -28,39 +28,13 @@ export function DistintivoVersion({ onAbrir }: { onAbrir: () => void }) {
   )
 }
 
-const celda: React.CSSProperties = { padding: '6px 8px', borderTop: '1px solid var(--color-line)', fontSize: '12px', verticalAlign: 'top' }
-
 export function Limitaciones({ onCerrar }: { onCerrar: () => void }) {
   return (
     <ModalInforme etiqueta="Versión, historial y limitaciones" titulo={`Escalera Inteligente v${VERSION_APP}`}
       subtitulo={`Versión ${VERSION_APP} (${COMMIT_APP}): cómo ha evolucionado y qué hay que tener presente al interpretar lo que registra y calcula.`}
       onCerrar={onCerrar}>
       <Bloque titulo="Historial de versiones">
-        <p style={{ fontSize: '12.5px', lineHeight: 1.55, margin: '0 0 8px', color: 'var(--color-paper-dim)' }}>
-          El historial público empieza en la 0.11.0. Las versiones anteriores se desarrollaron en el repositorio privado de la
-          tesis y se resumen aquí para dejar a la vista el trabajo que hay detrás. El detalle de cada una está en el archivo CHANGELOG del repositorio.
-        </p>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>
-              {['Versión', 'Fecha', 'Qué cambió'].map(c => (
-                <th key={c} style={{ textAlign: 'left', fontSize: '11px', color: 'var(--color-paper-faint)', padding: '4px 8px', borderBottom: '1px solid var(--color-line-strong)' }}>{c}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {HISTORIAL_VERSIONES.map(v => (
-                <tr key={v.version}>
-                  <td style={{ ...celda, fontFamily: 'var(--font-mono)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    {v.version}{v.publica ? '' : ' *'}
-                  </td>
-                  <td style={{ ...celda, whiteSpace: 'nowrap', color: 'var(--color-paper-dim)' }}>{v.fecha}</td>
-                  <td style={celda}><b>{v.titulo}.</b> <span style={{ color: 'var(--color-paper-dim)' }}>{v.cambios}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ fontSize: '11px', color: 'var(--color-paper-faint)', margin: '6px 0 0' }}>* Versión interna, anterior al historial público.</p>
+        <HistorialVersiones />
       </Bloque>
       {LIMITACIONES.map(l => (
         <Bloque key={l.titulo} titulo={l.titulo}>

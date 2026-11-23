@@ -20,7 +20,11 @@ function mensaje(s: VistaJugadorSnapshot): { titulo: string; texto?: string; col
   if (s.fin === 'bloqueo') return { titulo: 'Ya no quedan jugadas', texto: 'Vamos a ordenar los cubos para intentarlo otra vez.' }
   switch (s.estado) {
     case 'correccion': return { titulo: 'Esa jugada no se puede', texto: 'Devuelve los cubos así para seguir:', color: PPA_HEX.pausar }
-    case 'pausado': return { titulo: 'Pausa', color: PPA_HEX.pausar }
+    // La pausa técnica no usa el color de Pausar: no es un mensaje sobre la
+    // jugada del niño o la niña, sino del montaje, y no debe parecer una fase PPA.
+    case 'pausado': return s.pausaTecnica
+      ? { titulo: 'Un momento', texto: 'Estamos acomodando el tablero.' }
+      : { titulo: 'Pausa', color: PPA_HEX.pausar }
     case 'cuenta_regresiva': return { titulo: '¡Prepárate!' }
     case 'jugando': return { titulo: 'A jugar' }
     case 'bloqueado':
@@ -102,7 +106,9 @@ export default function VistaJugador({ enVentana = false }: { enVentana?: boolea
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--color-paper-faint)' }}>
         <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: s.baseConectada ? 'var(--color-online)' : 'var(--color-offline)' }} />
-        {s.baseConectada ? `Tablero conectado · ${s.conectados} de 10 cubos` : 'Tablero sin conexión'}
+        {/* Sin «N de 10 cubos» (2026-11-22): cuál cubo falla lo ve solo el
+            operador en el panel de cubos; al jugador no se le muestra la tramoya. */}
+        {s.baseConectada ? 'Tablero listo' : 'Tablero sin conexión'}
       </div>
 
       {s.cuenta !== null && (

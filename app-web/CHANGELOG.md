@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
 | **0.12.3** | 2026-11-21 | El juego al centro de la atención | Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado. |
 | **0.12.2** | 2026-11-21 | Logo oficial en la pestaña del navegador | La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular. |
 | **0.12.1** | 2026-11-21 | Textos sin montarse en celular y computador | Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse. |
@@ -36,6 +37,17 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.13.0 · 2026-11-23 · enlace confiable con el maestro y pausa técnica
+
+- **Corrección: jugadas duplicadas.** Una jugada que llegaba dos veces sumaba dos movimientos y duplicaba su marcador EEG. Ahora cada envío del maestro lleva un número de arranque y de secuencia, y el servidor y la pantalla descartan las copias.
+- **Corrección: reinicio del maestro.** Si el maestro se reiniciaba, la pantalla conservaba la lista de cubos anterior y podía iniciar un intento sin identificarlos. Ahora avisa del reinicio, cancela un inicio en curso y reidentifica los cubos solo cuando no hay intento; un arranque viejo ya no puede volver a mover el tablero.
+- **Calidad del enlace:** `GET /api/enlace` informa, por arranque, envíos recibidos, repetidos, perdidos, tardíos y sin clasificar; la bitácora anota cada salto de secuencia (`enlace_perdidas`) y cada reinicio (`maestro_reiniciado`). La latencia de cada jugada usa un reloj común entre el maestro y el servidor. Prueba automática del servidor: `node server/probar_enlace.mjs`.
+- **Compatibilidad:** el firmware publicado sigue siendo el v3, que no envía secuencia; con él todo funciona como antes.
+- **Pausa técnica:** botón aparte de «Pausar» para detener el intento por un problema del montaje (cubo, batería, cable). Se registra como `pausa_tecnica` / `fin_pausa_tecnica` en la bitácora de cubos (marcadores EEG 59 y 60), no en la de mediación, y el jugador ve «Un momento · Estamos acomodando el tablero».
+- **Jugadas rechazadas:** cada `falla_movimiento` anota `msDesdeListaCubos` y `edadDatoCuboMs`, para filtrar después las que pudieron deberse a un cubo ya desconectado. La regla de clasificación no cambia.
+- **Vista del jugador:** ya no muestra «N de 10 cubos»; ese diagnóstico queda en la consola del operador.
+- **Historial de versiones:** cada versión se despliega con sus correcciones, mejoras y novedades, con filtros por tipo.
 
 ## 0.12.3 · 2026-11-21 · el juego al centro de la atención
 

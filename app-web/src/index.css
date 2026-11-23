@@ -287,3 +287,9 @@ html, body { max-width: 100%; overflow-x: hidden; }
      lo recortaba: en el celular se ancla a la ventana. */
   .menu-perfil-desplegable { position: fixed !important; top: 50px !important; right: 8px !important; max-width: calc(100vw - 16px); }
 }
+
+@media (max-width: 760px) {
+  /* Historial de versiones: en el celular el detalle no se sangra bajo la
+     columna de la versión, que ya no tiene sitio al lado. */
+  .historial-versiones__detalle { padding-left: 14px !important; }
+}

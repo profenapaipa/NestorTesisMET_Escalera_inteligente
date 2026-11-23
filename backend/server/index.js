@@ -19,7 +19,8 @@ const BASE_TIMEOUT_MS = 5000
 // cierra o se cuelga a mitad de sesión, lo registrado hasta ese momento no
 // se pierde (antes solo existía en memoria hasta exportar el CSV). Son datos
 // de participantes: la carpeta está en .gitignore.
-const DIR_BITACORAS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bitacoras')
+// BITACORAS_DIR permite apuntar a otra carpeta (las pruebas usan una temporal).
+const DIR_BITACORAS = process.env.BITACORAS_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bitacoras')
 let colaDisco = Promise.resolve()
 function guardarEnDisco(sesion, registro) {
   const nombre = String(sesion || 'sin_sesion').replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 80)
@@ -108,6 +109,90 @@ let telemetriaCubos = [];
 // aunque los cubos estuvieran en desorden.
 let ultimasPosiciones = null;
 
+// ── Integridad de las publicaciones del maestro y reloj común (2026-11-21) ──
+// Con Maestro_v4, cada publicación de posiciones trae `arranque` (aleatorio
+// en cada encendido) y `seq` (1, 2, 3…). Aquí se descartan las copias de un
+// reintento, se cuentan las que faltan (saltos de secuencia) y las que llegan
+// tarde, y se detecta un reinicio del maestro. Sin esos campos (firmware v3)
+// todo funciona como antes. Hallazgo que lo motiva: T-001 (Codex) mostró que
+// una copia repetida sumaba 2 movimientos y duplicaba marcadores EEG.
+const enlaces = new Map() // arranque -> estado
+let arranqueVigente = null
+// Un arranque reemplazado por otro queda retirado para siempre: sus mensajes
+// atrasados no vuelven a declararlo vigente, no se llevan órdenes de la cola
+// ni mueven el tablero (bloqueante hallado por Codex en T-003).
+const retirados = new Set()
+function estadoEnlace(arranque) {
+  let e = enlaces.get(arranque)
+  if (!e) {
+    // huecos: intervalos [desde, hasta] de secuencias que faltan (saltos). Una
+    // publicación con seq <= ultimoSeq solo es «tardía» si cae en un hueco; si
+    // no, es una copia. Corrección T-003: la FIFO de 512 vistos expulsaba
+    // números ya vistos y una tardía podía descontar un hueco ajeno.
+    e = { arranque, desde: Date.now(), primerSeq: null, ultimoSeq: null, huecos: [],
+          recibidos: 0, duplicados: 0, perdidos: 0, tardios: 0, sinClasificar: 0, huecosRecortados: 0, limiteHistoria: 0,
+          fallosMaestro: 0, descartesCola: 0, reloj: [] }
+    enlaces.set(arranque, e)
+    if (enlaces.size > 20) enlaces.delete(enlaces.keys().next().value)
+  }
+  return e
+}
+// Devuelve true si el arranque es el vigente (o pasa a serlo) y false si está
+// retirado: en ese caso quien llama descarta el mensaje.
+function registrarArranque(arranque) {
+  if (arranqueVigente === arranque) return true
+  if (retirados.has(arranque)) return false
+  const anterior = arranqueVigente
+  arranqueVigente = arranque
+  if (anterior !== null) {
+    retirados.add(anterior)
+    // El tablero, la lista de cubos y su telemetría eran del maestro anterior:
+    // ya no valen (T-004: con la lista vieja, Control identificaba antes de que
+    // volvieran los cubos del maestro nuevo).
+    ultimasPosiciones = null
+    esclavosConectados = []
+    telemetriaCubos = []
+    io.emit('esclavosConectados', { esclavos: [], telemetria: [], tsBackend: Date.now() })
+    console.log(`Maestro reiniciado (arranque ${anterior} -> ${arranque})`)
+    io.emit('maestroReiniciado', { anterior, arranque, tsBackend: Date.now() })
+    guardarEnDisco('enlace', { registro: 'maestro_reiniciado', anterior, arranque })
+  }
+  return true
+}
+function resumenEnlace(e) {
+  const reloj = relojDe(e)
+  return { arranque: e.arranque, recibidos: e.recibidos, duplicados: e.duplicados, perdidos: e.perdidos,
+           tardios: e.tardios, sinClasificar: e.sinClasificar, huecosRecortados: e.huecosRecortados,
+           fallosMaestro: e.fallosMaestro, descartesCola: e.descartesCola, ultimoSeq: e.ultimoSeq,
+           relojDesfaseMs: reloj?.desfase ?? null, relojErrorMs: reloj?.error ?? null }
+}
+
+// Reloj común (estilo NTP). Cada consulta del maestro v4 trae el intercambio
+// ANTERIOR completo: t0 (salida) y t1 (llegada de la respuesta) en el reloj
+// del maestro, y s, la hora del backend que iba en esa respuesta. El desfase
+// verdadero queda entre s − t1 y s − t0; se usa la muestra más estrecha de los
+// últimos 30 s (filtrada al LEER, para no usar muestras viejas si dejan de
+// llegar) y el error informado es la mitad de su ancho. Corrección T-003: antes
+// se usaba la llegada − t, que incluye la demora de ida, y un error de r/2 de
+// otro intercambio (podía informar 1 ms con 400 ms de error real).
+const RELOJ_VENTANA_MS = 30000
+function muestraReloj(e, t0, t1, sBackend) {
+  const ahora = Date.now()
+  if (!(t1 >= t0) || !(sBackend <= ahora) || ahora - sBackend > 60000) return
+  e.reloj.push({ s: sBackend, lo: sBackend - t1, hi: sBackend - t0 })
+  while (e.reloj.length && ahora - e.reloj[0].s > RELOJ_VENTANA_MS) e.reloj.shift()
+}
+function relojDe(e) {
+  const ahora = Date.now()
+  // Vigencia contada desde s, cuando ocurrió el intercambio en el reloj del
+  // backend: una muestra que llega tarde no gana vigencia (T-004).
+  const vigentes = e.reloj.filter(m => ahora >= m.s && ahora - m.s <= RELOJ_VENTANA_MS)
+  if (!vigentes.length) return null
+  let mejor = vigentes[0]
+  for (const m of vigentes) if (m.hi - m.lo < mejor.hi - mejor.lo) mejor = m
+  return { desfase: Math.round((mejor.lo + mejor.hi) / 2), error: Math.ceil((mejor.hi - mejor.lo) / 2), muestras: vigentes.length }
+}
+
 // se llama cada vez que la base física hace una petición a la API
 function markBaseActivity() {
   lastBaseSeen = Date.now();
@@ -128,6 +213,7 @@ setInterval(() => {
 
 io.on("connection", (socket) => {
   socket.emit('baseStatus', { connected: baseConnected });
+  if (arranqueVigente !== null) socket.emit('arranqueVigente', { arranque: arranqueVigente });
   socket.emit('esclavosConectados', { esclavos: esclavosConectados, telemetria: telemetriaCubos });
   if (ultimasPosiciones) socket.emit('actualizarPosiciones', { ...ultimasPosiciones, origen: 'cache' });
 
@@ -140,6 +226,7 @@ io.on("connection", (socket) => {
     // perfiles), así que los avisos que llegan al conectar se perdían y
     // Control quedaba mostrando "Desconectado" con la base activa.
     socket.emit('baseStatus', { connected: baseConnected });
+    if (arranqueVigente !== null) socket.emit('arranqueVigente', { arranque: arranqueVigente });
     socket.emit('esclavosConectados', { esclavos: esclavosConectados, telemetria: telemetriaCubos });
     if (ultimasPosiciones) socket.emit('actualizarPosiciones', { ...ultimasPosiciones, origen: 'cache' });
     encolar({ mensaje: "reportarPosiciones" });
@@ -191,6 +278,18 @@ app.get('/', (req, res) => {
 
 
 app.get("/api/obtenerComando", (req, res) => {
+  // Maestro v4: un arranque retirado no se lleva órdenes; el vigente aporta
+  // su muestra de reloj y sus contadores.
+  const a = Number(req.query.a)
+  if (Number.isFinite(a) && a > 0) {
+    if (!registrarArranque(a)) return res.json({ comandos: [], s: Date.now() })  // sin markBaseActivity
+    const e = estadoEnlace(a)
+    const t0 = Number(req.query.t0), t1 = Number(req.query.t1), sB = Number(req.query.s)
+    if ([t0, t1, sB].every(Number.isFinite)) muestraReloj(e, t0, t1, sB)
+    const f = Number(req.query.f), q = Number(req.query.q)
+    if (Number.isSafeInteger(f) && f >= 0) e.fallosMaestro = Math.max(e.fallosMaestro, f)
+    if (Number.isSafeInteger(q) && q >= 0) e.descartesCola = Math.max(e.descartesCola, q)
+  }
   markBaseActivity();
   // Drena toda la cola de una vez (Node es de un solo hilo: no hay
   // condición de carrera entre este drenado y los push() de comandoCubo).
@@ -206,7 +305,8 @@ app.get("/api/obtenerComando", (req, res) => {
     if (latenciasOrden.length > 2000) latenciasOrden.shift();
     guardarEnDisco('latencias-orden', { tipo, cubo: c?.id ?? null, esperaColaMs: esperaMs });
   });
-  res.json({ comandos });
+  // s: hora del backend, para que el maestro cierre el intercambio del reloj común.
+  res.json({ comandos, s: Date.now() });
 });
 
 // Resumen de la espera en cola (ms) de las últimas órdenes entregadas.
@@ -230,6 +330,10 @@ app.get("/api/obtenerComandoGlobal", (req, res) => {
 });
 
 app.post('/api/esclavosConectados', (req, res) => {
+  const arrEsc = Number(req.body?.arranque)
+  if (Number.isFinite(arrEsc) && arrEsc > 0 && !registrarArranque(arrEsc)) {
+    return res.status(200).json({ mensaje: 'Arranque retirado: no se aplica' })
+  }
   markBaseActivity();
   const antes = esclavosConectados.join(',');
   esclavosConectados = req.body.esclavos ?? [];
@@ -240,12 +344,96 @@ app.post('/api/esclavosConectados', (req, res) => {
   res.status(200).json({ mensaje: 'OK' });
 });
 
+// Estado del enlace con el maestro: copias, faltantes, tardías y reloj.
+app.get('/api/enlace', (req, res) => {
+  res.json({ vigente: arranqueVigente, enlaces: [...enlaces.values()].map(resumenEnlace) })
+})
+
 app.post('/api/posiciones', (req, res) => {
-  markBaseActivity();
+  // Maestro v4: integridad por (arranque, seq). Compatibilidad con el v3 solo
+  // si no viene NINGUNO de los dos campos; si vienen y son inválidos, no se aplica.
+  const traeArranque = req.body?.arranque !== undefined, traeSeq = req.body?.seq !== undefined
+  const arranque = Number(req.body?.arranque), seq = Number(req.body?.seq)
+  let enlace = null, faltanEnSalto = 0
+  if ((traeArranque || traeSeq) && !(Number.isFinite(arranque) && arranque > 0 && Number.isSafeInteger(seq) && seq > 0)) {
+    return res.status(400).json({ mensaje: 'arranque/seq inválidos' })
+  }
+  if (traeArranque && traeSeq) {
+    if (!registrarArranque(arranque)) {
+      guardarEnDisco('enlace', { registro: 'arranque_retirado', arranque, seq })
+      return res.status(200).json({ mensaje: 'Arranque retirado: no se aplica', seq })
+    }
+    markBaseActivity();
+    const e = estadoEnlace(arranque)
+    const f = Number(req.body.fallos)
+    if (Number.isSafeInteger(f) && f >= 0) e.fallosMaestro = Math.max(e.fallosMaestro, f)
+    if (e.ultimoSeq !== null && seq <= e.ultimoSeq) {
+      const i = e.huecos.findIndex(([lo, hi]) => lo <= seq && seq <= hi)
+      // Anterior a la primera secuencia vista, o a los huecos que ya no se
+      // guardan: no se sabe si es copia o tardía (T-004).
+      const sinHistoria = seq < e.primerSeq || (e.huecosRecortados > 0 && seq < e.limiteHistoria)
+      if (i < 0 && sinHistoria) {
+        e.sinClasificar++
+        guardarEnDisco('enlace', { registro: 'sin_clasificar', arranque, seq })
+        return res.status(200).json({ mensaje: 'Sin clasificar: anterior a la historia guardada', seq })
+      }
+      if (i < 0) {
+        e.duplicados++
+        guardarEnDisco('enlace', { registro: 'duplicado', arranque, seq, intento: req.body.intento ?? null })
+        return res.status(200).json({ mensaje: 'Duplicado: ya recibido', seq })
+      }
+      // Tardía: llegó una publicación que faltaba, pero el tablero ya avanzó
+      // con otra posterior; no se aplica (lo haría retroceder) y queda su
+      // contenido en el registro, para saber qué jugada no pasó por el juego.
+      const [lo, hi] = e.huecos[i]
+      e.huecos.splice(i, 1, ...[[lo, seq - 1], [seq + 1, hi]].filter(([x, y]) => x <= y))
+      e.tardios++
+      e.perdidos--
+      guardarEnDisco('enlace', { registro: 'tardio', arranque, seq, ultimoSeq: e.ultimoSeq,
+        origen: req.body.origen ?? null, tMaestro: req.body.tMaestro ?? null,
+        posiciones: req.body.posiciones ?? null, presencia: req.body.presencia ?? null })
+      return res.status(200).json({ mensaje: 'Tardío: no se aplica', seq })
+    }
+    if (e.ultimoSeq !== null && seq > e.ultimoSeq + 1) {
+      faltanEnSalto = seq - e.ultimoSeq - 1
+      e.perdidos += faltanEnSalto
+      e.huecos.push([e.ultimoSeq + 1, seq - 1])
+      if (e.huecos.length > 5000) {
+        // Muchísimos huecos: se olvida el más antiguo, pero se deja constancia
+        // de que lo anterior ya no se puede clasificar.
+        const [, hi] = e.huecos.shift()
+        e.huecosRecortados++
+        e.limiteHistoria = hi + 1
+      }
+      guardarEnDisco('enlace', { registro: 'faltantes', arranque, desde: e.ultimoSeq + 1, hasta: seq - 1, faltan: faltanEnSalto })
+    }
+    if (e.primerSeq === null) e.primerSeq = seq
+    e.ultimoSeq = seq
+    e.recibidos++
+    enlace = e
+  } else {
+    markBaseActivity();
+  }
   // tsBackend: hora de llegada al backend. Con edadMs (cuánto esperó el
   // evento en el maestro) y rttMs (lo que tardó el POST anterior), el
   // frontend estima la latencia completa y la hora real de cada jugada.
+  // Con el reloj común (v4) se añade tFisico: la hora de la detección en el
+  // reloj del PC, y su error estimado.
   const posiciones = { ...req.body, tsBackend: Date.now() };
+  if (enlace) {
+    posiciones.enlace = { ...resumenEnlace(enlace), faltanEnSalto }
+    const reloj = relojDe(enlace)
+    const tMaestro = Number(req.body.tMaestro)
+    if (reloj && Number.isFinite(tMaestro)) {
+      const tFisico = tMaestro + reloj.desfase
+      // Una detección no puede ser posterior a su llegada: si lo fuera, el
+      // reloj no es fiable y no se informa (corrección T-003).
+      if (tFisico <= posiciones.tsBackend) {
+        posiciones.tFisico = tFisico
+        posiciones.relojErrorMs = reloj.error
+      }
+    }
+  }
   console.log('Posiciones recibidas:')
   console.log(posiciones)
   if (Array.isArray(posiciones?.posiciones)) {
@@ -261,6 +449,8 @@ app.post('/api/posiciones', (req, res) => {
 
 
 server.listen(port, () => {
+  // Para las pruebas (PORT=0 elige un puerto libre): se avisa cuál quedó.
+  process.send?.({ puerto: server.address().port })
   console.log('Servidor corriendo en el puerto: ', port)
   console.log(`Dirección del servidor -> localhost:${port}`)
 })
@@ -290,6 +480,8 @@ udpServer.on('message', (msg, rinfo) => {
   }
 })
 
-udpServer.bind(4210, () => {
+// DESACTIVAR_DESCUBRIMIENTO=1 (pruebas): no se abre el puerto UDP 4210, que
+// puede estar ocupado por el backend real.
+if (process.env.DESACTIVAR_DESCUBRIMIENTO !== '1') udpServer.bind(4210, () => {
   console.log(`[UDP] Escuchando descubrimiento en puerto 4210 | IP: ${getLocalIP()}`)
 })

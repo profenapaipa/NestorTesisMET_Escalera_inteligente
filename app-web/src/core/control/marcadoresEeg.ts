@@ -42,6 +42,8 @@ export const CODIGOS_MARCADOR = {
   deshacer: 56,           // el participante deshace la última jugada (vistas en pantalla)
   pista: 57,              // el participante pide una pista (vistas en pantalla)
   callejon_sin_salida: 58, // el participante entra en un callejón sin salida
+  pausa_tecnica: 59,      // el operador detiene por un problema del montaje (no es Pausar PPA)
+  fin_pausa_tecnica: 60,  // se reanuda tras la pausa técnica
 } as const
 
 export type TipoMarcador = keyof typeof CODIGOS_MARCADOR
