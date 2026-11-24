@@ -381,7 +381,7 @@ function Tutorial({ level, operatorId, participante, onComplete, onGoToLevel, on
           }>
             Tablero · nivel {level}
           </SectionTitle>
-          <SimBoard
+          <SimBoard permitir3d
             board={board}
             prev={prev}
             disabled={phase !== 'jugando'}

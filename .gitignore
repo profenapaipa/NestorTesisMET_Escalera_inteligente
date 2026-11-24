@@ -19,3 +19,7 @@ secrets.h
 backend/bitacoras/
 *-Sesi*n*/
 DATOS_PRIVADOS*/
+
+# Copias de respaldo de los agentes: nunca en el público
+*.antes-*
+

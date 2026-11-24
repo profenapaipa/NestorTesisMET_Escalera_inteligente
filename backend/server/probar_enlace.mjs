@@ -7,7 +7,7 @@ import { fork } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 
 const aqui = path.dirname(fileURLToPath(import.meta.url))
@@ -23,7 +23,7 @@ let srv = null, cli = null, cli2 = null
 try {
   srv = fork(path.join(aqui, 'index.js'), [], {
     cwd: aqui, silent: true,
-    env: { ...process.env, PORT: '0', BITACORAS_DIR: tmpBit, DESACTIVAR_DESCUBRIMIENTO: '1' },
+    env: { ...process.env, PORT: '0', BITACORAS_DIR: tmpBit, DESACTIVAR_DESCUBRIMIENTO: '1', ORDEN_MAX_REENVIOS: '3' },
   })
   srv.stdout.resume(); srv.stderr.resume()
   const puerto = await conPlazo(new Promise((si, no) => {
@@ -115,6 +115,88 @@ try {
   cli2 = io(U, { transports: ['websocket'] })
   const vig = await conPlazo(new Promise(r => cli2.on('arranqueVigente', r)), 5000, 'aviso del arranque vigente')
   ok(vig.arranque === C, 'al conectarse, la pantalla recibe el arranque vigente')
+
+  // ── T-014: órdenes con confirmación (oid / ack), sin pérdidas ──
+  const D = 9001
+  const cuerpoGet = (a, ack, e) => consulta({ a, t: 1, ack, e })    // maestro con ack: lleva la época que aprendió
+  const ordenar = async (...cmds) => { for (const c of cmds) cli.emit('comandoCubo', c); await sleep(150) }
+  const g0 = await cuerpoGet(D, 0, 0)                                  // primer GET del maestro: época aún desconocida
+  ok(typeof g0.e === 'number' && Array.isArray(g0.comandos) && g0.comandos.length === 0, 'con ack, la respuesta trae la época del backend (e)')
+  const E = g0.e
+  await ordenar({ id: 1, color: [255, 0, 0] }, { id: 2, efecto: 3 }, { id: 'all', color: [0, 0, 255] })
+  const g1 = await cuerpoGet(D, 0, E)
+  ok(g1.comandos.length === 3 && g1.comandos.every((c, i) => i === 0 || c.oid === g1.comandos[i - 1].oid + 1), 'las órdenes salen con oid creciente y en orden')
+  const o1 = g1.comandos[0].oid
+  // Respuesta perdida/truncada: el maestro no pudo procesarla, no confirma → reenvío con el MISMO oid.
+  const g2 = await cuerpoGet(D, 0, E)
+  ok(g2.comandos.length === 3 && g2.comandos.map(c => c.oid).join() === g1.comandos.map(c => c.oid).join(), 'sin confirmar (respuesta truncada): se reenvían las 3 con el mismo oid')
+  // Confirmación parcial: aplicó hasta la segunda.
+  const g3 = await cuerpoGet(D, o1 + 1, E)
+  ok(g3.comandos.length === 1 && g3.comandos[0].oid === o1 + 2 && g3.comandos[0].id === 'all', 'un ack parcial retira solo lo confirmado')
+  // ack duplicado (el mismo dos veces) y una orden nueva: la nueva no se pierde ni se repite lo viejo.
+  await ordenar({ id: 4, color: [0, 255, 0] })
+  const g4 = await cuerpoGet(D, o1 + 2, E)
+  const g5 = await cuerpoGet(D, o1 + 2, E)                              // ack duplicado, la nueva sigue sin confirmar
+  ok(g4.comandos.length === 1 && g4.comandos[0].id === 4 && g5.comandos.length === 1 && g5.comandos[0].oid === g4.comandos[0].oid, 'un ack duplicado no retira lo posterior: la orden nueva se reenvía hasta confirmarse')
+  const g6 = await cuerpoGet(D, g4.comandos[0].oid, E)
+  const g7 = await cuerpoGet(D, g4.comandos[0].oid, E)
+  ok(g6.comandos.length === 0 && g7.comandos.length === 0, 'confirmada, la cola queda vacía (también con el ack repetido)')
+  // ack de otra época (backend reiniciado) o inventado: no retira nada.
+  await ordenar({ id: 5, color: [1, 2, 3] })
+  const g8 = await cuerpoGet(D, 999999, E + 1)
+  ok(g8.comandos.length === 1 && g8.comandos[0].id === 5, 'un ack con época distinta se trata como 0: la orden sigue pendiente')
+  const g8b = await cuerpoGet(D, 999999, E)                            // ack mayor que lo emitido: se acota al último oid
+  ok(g8b.comandos.length === 0, 'un ack mayor que lo emitido se acota al último oid (no rompe la cola)')
+  // Reinicio del maestro: arranque nuevo, ack 0, época aún desconocida → recibe lo pendiente.
+  await ordenar({ id: 6, color: [9, 9, 9] })
+  const D2 = 9002
+  const r0 = await cuerpoGet(D2, 0, 0)
+  ok(r0.comandos.length === 1 && r0.comandos[0].id === 6 && r0.comandos[0].oid > o1, 'maestro reiniciado (ack 0, arranque nuevo): recibe lo pendiente; los oid del backend siguen creciendo')
+  const rr1 = await cuerpoGet(D2, r0.comandos[0].oid, r0.e)
+  ok(rr1.comandos.length === 0, 'el maestro nuevo confirma y la cola se vacía')
+  const viejoD = await cuerpoGet(D, 0, E)
+  ok(viejoD.comandos.length === 0 && viejoD.e === undefined, 'el arranque retirado no recibe órdenes ni confirma')
+  // Confirmación por el POST de posiciones.
+  await ordenar({ id: 7, color: [7, 7, 7] })
+  const p0 = await cuerpoGet(D2, 0, E)
+  await post({ arranque: D2, seq: 1, tMaestro: 5, ack: p0.comandos[0]?.oid, e: E })
+  const p1 = await cuerpoGet(D2, 0, E)                               // la orden ya la confirmó el POST
+  ok(p0.comandos.length === 1 && p1.comandos.length === 0, 'el ack también se acepta en el POST de posiciones')
+  // Compatibilidad v3: sin ack se drena todo y las órdenes salen sin oid.
+  await ordenar({ id: 8, color: [8, 8, 8] }, { id: 9, efecto: 4 })
+  const v3 = await consulta({ a: D2, t: 2 })
+  const v3b = await consulta({ a: D2, t: 3 })
+  ok(v3.comandos.length === 2 && v3.comandos.every(c => c.oid === undefined) && v3.e === undefined && v3b.comandos.length === 0, 'compatibilidad v3 (sin ack): se drena todo, sin oid, como antes')
+  const v3puro = await fetch(`${U}/api/obtenerComando`).then(r => r.json())
+  ok(Array.isArray(v3puro.comandos) && typeof v3puro.s === 'number', 'v3 sin parámetros ni arranque: responde como antes')
+  // Colapso y lote acotado: 60 estados del cubo 1 (+1 del cubo 2) no crecen sin límite ni se desbordan en un GET.
+  for (let i = 1; i <= 60; i++) cli.emit('comandoCubo', { id: 1, color: [i, 0, 0] })
+  cli.emit('comandoCubo', { id: 2, color: [0, 0, 77] })
+  await sleep(300)
+  const c1 = await cuerpoGet(D2, 0, E)
+  ok(c1.comandos.length <= 16, `el lote por GET está acotado (${c1.comandos.length} <= 16)`)
+  const enlCol = await (await fetch(U + '/api/enlace')).json()
+  ok(enlCol.ordenes.colapsadas > 0 && enlCol.ordenes.pendientes < 61, `las órdenes reemplazables se colapsan (colapsadas ${enlCol.ordenes.colapsadas}, pendientes ${enlCol.ordenes.pendientes})`)
+  let ultimo = 0, vistos = []
+  for (let k = 0; k < 6; k++) {
+    const g = await cuerpoGet(D2, ultimo, E)
+    if (!g.comandos.length) break
+    vistos.push(...g.comandos)
+    ultimo = g.comandos.at(-1).oid
+  }
+  ok(vistos.some(c => c.id === 1 && c.color[0] === 60) && vistos.some(c => c.id === 2 && c.color[2] === 77), 'tras colapsar siguen llegando el último estado del cubo 1 (60) y el del cubo 2')
+  ok(vistos.every((c, i) => i === 0 || c.oid > vistos[i - 1].oid), 'el orden por oid se conserva tras colapsar')
+  await cuerpoGet(D2, ultimo, E)
+  // orden_no_confirmada: el servidor de la prueba se arrancó con 3 envíos máximo.
+  await ordenar({ id: 10, color: [4, 4, 4] })
+  const antesNC = (await (await fetch(U + '/api/enlace')).json()).ordenes.noConfirmadas
+  for (let k = 0; k < 3; k++) await cuerpoGet(D2, ultimo, E)           // 3 envíos sin confirmar
+  const ultimoVacio = await cuerpoGet(D2, ultimo, E)                   // el cuarto GET la retira
+  await sleep(300)
+  const enlNC = await (await fetch(U + '/api/enlace')).json()
+  const bitEnlace = readFileSync(path.join(tmpBit, 'enlace.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+  ok(enlNC.ordenes.noConfirmadas === antesNC + 1 && ultimoVacio.comandos.length === 0, 'tras N envíos sin confirmar la orden se retira y se cuenta (noConfirmadas)')
+  ok(bitEnlace.some(r => r.registro === 'orden_no_confirmada' && r.orden?.id === 10 && r.envios === 3), 'queda registrada en la bitácora como orden_no_confirmada (sin silencio)')
 
   // ── Firmware v3: sin arranque ni secuencia ──
   const n = recibidas.length

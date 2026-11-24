@@ -13,6 +13,7 @@ import {
 import hexToRgbArray from './core/utils/hextToRgb'
 import { cubosDesubicados, ventanaIgual } from './core/control/ordenTablero'
 import TableroFisico, { type CeldaTablero, type CuboLevantado, type CubeVisual } from './components/control/TableroFisico'
+import Tablero3D, { type AcabadoTablero3D } from './components/control/Tablero3D'
 import { publicarVistaJugador, escucharPedidosVistaJugador, type VistaJugadorSnapshot } from './core/control/vistaJugador'
 import { type TelemetriaCubo, type MarcaLatencia, estimarLatencia, porcentajeBateria, textoSinMedicion, motivoReinicio, reinicioAnomalo, BATERIA_BAJA_PCT } from './core/control/telemetria'
 import { type MarcadorEeg, type TipoMarcador, crearMarcador, toCsvMarcadores } from './core/control/marcadoresEeg'
@@ -145,6 +146,23 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // comparando posiciones sucesivas contra las reglas del juego (ver
   // laEscaleraRules) — informativo, nunca dispara nada solo.
   const [tick,            setTick]            = useState(0)
+  // Preferencia puramente visual del operador. La vista 2D sigue siendo la
+  // predeterminada y la Vista del jugador no cambia.
+  const [vistaTablero, setVistaTablero] = useState<'2d' | '3d'>(() => {
+    // Por omisión 3D (decisión del autor, 2026-11-23); la clave .v2 descarta la preferencia vieja.
+    try { return localStorage.getItem('escalera:control:vista-tablero.v2') === '2d' ? '2d' : '3d' }
+    catch { return '3d' }
+  })
+  const [acabadoTablero3D, setAcabadoTablero3D] = useState<AcabadoTablero3D>(() => {
+    try { return localStorage.getItem('escalera:control:acabado-tablero-3d.v2') === 'minimalista' ? 'minimalista' : 'mdf' }
+    catch { return 'mdf' }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('escalera:control:vista-tablero.v2', vistaTablero)
+      localStorage.setItem('escalera:control:acabado-tablero-3d.v2', acabadoTablero3D)
+    } catch { /* La vista funciona aunque el navegador bloquee almacenamiento. */ }
+  }, [vistaTablero, acabadoTablero3D])
 
   // ── Control de partida (Iniciar/Pausar/Reiniciar) ──────────────────────────
   const [sessionState,   setSessionState]   = useState<SessionState>('inactivo')
@@ -1492,6 +1510,28 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   }, [maestroReiniciado, identificando, isBaseConnected, esclavos.length])
   const puedeReidentificar = isBaseConnected && identificando === null
     && (sessionState === 'inactivo' || sessionState === 'bloqueado' || sessionState === 'victoria')
+  // «Buscar conexión» (T-012): durante la búsqueda los cubos que el maestro aún no ve se pintan con el LED magenta
+  // del firmware («buscando Wi-Fi»); al terminar (todos conectados o a los 12 s, el mismo plazo de la ronda de
+  // identificación) los que siguen sin conexión quedan con su color de equipo. Si hay enlace con la base, se lanza
+  // además la ronda de identificación existente; la lógica de identificación y lo enviado al hardware no cambian.
+  const [buscandoConexion, setBuscandoConexion] = useState(false)
+  const [busquedaTerminada, setBusquedaTerminada] = useState(false)
+  const busquedaTimerRef = useRef(0)
+  const cubosConectados = esclavos.filter(id => id >= 1 && id <= 10).length
+  function buscarConexion() {
+    window.clearTimeout(busquedaTimerRef.current)
+    setBusquedaTerminada(false)
+    setBuscandoConexion(true)
+    busquedaTimerRef.current = window.setTimeout(() => { setBuscandoConexion(false); setBusquedaTerminada(true) }, 12000)
+    if (puedeReidentificar) solicitarIdentificacion('manual')
+  }
+  useEffect(() => {
+    if (buscandoConexion && cubosConectados >= 10) {
+      window.clearTimeout(busquedaTimerRef.current)
+      setBuscandoConexion(false); setBusquedaTerminada(true)
+    }
+  }, [buscandoConexion, cubosConectados])
+  useEffect(() => () => window.clearTimeout(busquedaTimerRef.current), [])
   useEffect(() => {
     if (!isBaseConnected || !sincronizado || esclavos.length === 0 || identificando) return
     if (sessionState !== 'inactivo' && sessionState !== 'bloqueado' && sessionState !== 'victoria') return
@@ -1761,7 +1801,19 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
         <div style={{ ...panel, flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
             <span style={{ ...sectionLabel, display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 auto', minWidth: 'min(100%, 260px)' }}><StepMark />Tablero · {pares} par{pares > 1 ? 'es' : ''} · {visibleCubes.length} posiciones · esclavos {esclavos.length}/10</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px 16px', flexWrap: 'wrap', minWidth: 0 }}>
+              <div className="tablero-mode-controls" aria-label="Representación del tablero">
+                <div className="tablero-mode-group" role="group" aria-label="Vista">
+                  <button type="button" className="tablero-mode-button" aria-pressed={vistaTablero === '2d'} onClick={() => setVistaTablero('2d')}>2D</button>
+                  <button type="button" className="tablero-mode-button" aria-pressed={vistaTablero === '3d'} onClick={() => setVistaTablero('3d')}>3D</button>
+                </div>
+                {vistaTablero === '3d' && (
+                  <div className="tablero-mode-group" role="group" aria-label="Acabado de la base 3D">
+                    <button type="button" className="tablero-mode-button" aria-pressed={acabadoTablero3D === 'minimalista'} onClick={() => setAcabadoTablero3D('minimalista')}>Minimalista</button>
+                    <button type="button" className="tablero-mode-button" aria-pressed={acabadoTablero3D === 'mdf'} onClick={() => setAcabadoTablero3D('mdf')}>MDF</button>
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '14px' }}>
                 {[
                   { label: 'Equipo A', color: teamAColor },
@@ -1779,6 +1831,22 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
                   suelto en el encabezado general de la página. */}
               {/* Ronda manual de identificación por IP: qué cubo está de
                   verdad en cada casilla. Solo con la partida detenida. */}
+              <button
+                type="button"
+                onClick={buscarConexion}
+                disabled={buscandoConexion}
+                title="Muestra con el LED magenta los cubos que el maestro todavía no ve y los va conectando y encajando en la base a medida que aparecen. Al terminar, los que sigan sin conexión quedan con el LED de su color de equipo."
+                style={{
+                  background: buscandoConexion ? 'var(--color-blue)' : 'transparent', border: '1px solid var(--color-line-strong)', borderRadius: 'var(--radius)',
+                  padding: '3px 8px', fontSize: '11px', color: buscandoConexion ? '#fff' : 'var(--color-paper-dim)',
+                  cursor: buscandoConexion ? 'progress' : 'pointer',
+                }}
+              >
+                {buscandoConexion ? 'Buscando conexión…' : 'Buscar conexión'}
+              </button>
+              <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+                {buscandoConexion ? `Buscando conexión… ${cubosConectados} de 10 cubos conectados` : busquedaTerminada ? `Búsqueda terminada: ${cubosConectados} de 10 cubos conectados` : ''}
+              </span>
               <button
                 onClick={() => solicitarIdentificacion('manual')}
                 disabled={!puedeReidentificar}
@@ -1814,16 +1882,28 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
 
           {/* Bajo cada cubo: punto = WiFi del cubo (verde/rojo); barra =
               lo que lee la base en esa casilla (azul = detecta un cubo). */}
-          <div ref={ajusteTablero.ref} style={{ overflowX: 'auto' }}>
-            <TableroFisico
-              zoom={ajusteTablero.escala}
+          {vistaTablero === '2d' ? (
+            <div ref={ajusteTablero.ref} style={{ overflowX: 'auto' }} data-testid="control-board-2d">
+              <TableroFisico
+                zoom={ajusteTablero.escala}
+                celdas={celdasTablero}
+                primeraCasilla={offVentana}
+                levantados={levantadosVentana}
+                seleccionado={selectedCubeId}
+                onSelect={setSelectedCubeId}
+                mostrarPresencia={presencia !== null} />
+            </div>
+          ) : (
+            <Tablero3D
               celdas={celdasTablero}
               primeraCasilla={offVentana}
               levantados={levantadosVentana}
               seleccionado={selectedCubeId}
               onSelect={setSelectedCubeId}
-              mostrarPresencia={presencia !== null} />
-          </div>
+              mostrarPresencia={presencia !== null}
+              buscando={buscandoConexion}
+              acabado={acabadoTablero3D} />
+          )}
           {pruebaBase && <PruebaBase presencia={presencia} onCerrar={() => setPruebaBase(false)} />}
           {cubosBateriaBaja.length > 0 && (
             <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-offline)' }}>

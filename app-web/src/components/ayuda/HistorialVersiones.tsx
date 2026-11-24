@@ -19,11 +19,6 @@ function plural(k: number, t: TipoCambio) {
   return `${k} ${k === 1 ? i.singular : i.plural.toLowerCase()}`
 }
 
-function fechaLarga(iso: string) {
-  const [a, mes, d] = iso.split('-').map(Number)
-  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  return `${d} ${meses[mes - 1]} ${a}`
-}
 
 export default function HistorialVersiones() {
   const [filtro, setFiltro] = useState<TipoCambio | 'todo'>('todo')
@@ -87,9 +82,7 @@ export default function HistorialVersiones() {
                 }}>
                 <ChevronDown size={15} aria-hidden style={{ flexShrink: 0, marginTop: '3px', color: 'var(--color-paper-faint)', transform: abierta ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
                 <span style={{ flexShrink: 0, width: '78px' }}>
-                  <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '14px' }}>{v.version}</span>
-                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-paper-faint)', marginTop: '2px' }}>{fechaLarga(v.fecha)}</span>
-                </span>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '14px' }}>{v.version}</span>                </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 8px' }}>
                     <b style={{ fontSize: '13.5px' }}>{v.titulo}</b>

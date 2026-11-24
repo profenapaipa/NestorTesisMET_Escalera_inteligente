@@ -194,7 +194,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
         </SectionTitle>
         {status === 'victoria' && <EndBanner kind="victoria" title="¡Victoria!" detail={`Intercambio completo en ${moves} movimientos. Usa «Reiniciar tablero» para empezar de nuevo.`} />}
         {status === 'bloqueado' && <EndBanner kind="bloqueo" title="Camino sin retorno: bloqueado" detail="La única jugada que queda es volver a la posición anterior, y eso no se permite. Usa «Reiniciar tablero»." />}
-        <SimBoard
+        <SimBoard permitir3d
           board={board} prev={prevBoard} disabled={status !== 'jugando'}
           selected={selectedPos} onSelect={i => { setSelectedPos(i); setErrorCell(null) }}
           onTapPiece={i => { const p = board[i]; if (p) setSelectedCubeId(p.id) }}

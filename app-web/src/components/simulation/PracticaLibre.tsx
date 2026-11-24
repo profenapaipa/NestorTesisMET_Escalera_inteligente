@@ -58,6 +58,12 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
   const [actual, setActual] = useState<number[]>([1])
   const [previosPorPares, setPreviosPorPares] = useState<Record<number, number[][]>>({})
   const [, setTick] = useState(0)
+  // Señal PPA que el operador envía: se ve en el cubo seleccionado (o en el último movido) del tablero 3D,
+  // con color, temblor y cono, y se apaga sola a los AUTO_OFF_MS (como en Control y en Control simulado).
+  const [cubeActions, setCubeActions] = useState<Record<number, PPAPhase>>({})
+  const ultimoCuboRef = useRef<number | null>(null)
+  const offTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+  useEffect(() => { const t = offTimers.current; return () => Object.values(t).forEach(clearTimeout) }, [])
   const startRef = useRef(0)
   const [finalMs, setFinalMs] = useState(0) // duración del intento al terminar (el cronómetro se queda ahí)
   const [informeAbierto, setInformeAbierto] = useState(false)
@@ -135,6 +141,12 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
     motor.enviar(fase, `Operador envió ${fase.toUpperCase()} por iniciativa propia`)
     setLastActivation({ fase, at: nowIso() })
     playPpaFeedback(fase, AUTO_OFF_MS / 1000)
+    const id = (selected !== null ? board[selected]?.id : undefined) ?? ultimoCuboRef.current
+    if (id != null) {
+      if (offTimers.current[id]) clearTimeout(offTimers.current[id])
+      setCubeActions(prev => ({ ...prev, [id]: fase }))
+      offTimers.current[id] = setTimeout(() => setCubeActions(prev => { const n = { ...prev }; delete n[id]; return n }), AUTO_OFF_MS)
+    }
   }
 
   function abortToIdle(newPares: number) {
@@ -206,6 +218,7 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
     const res = classifyAttempt(board, from, to, prevBoard)
     if (!res.ok) return
     const piece = board[from]!
+    ultimoCuboRef.current = piece.id
     const next = applyMove(board, from, to)
     const m = moves + 1
     setPrevBoard(board)
@@ -303,10 +316,10 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
           <EndBanner kind="bloqueo" title="Camino sin retorno: bloqueado"
             detail="La única jugada que queda es volver a la posición anterior, y la Regla 2 no lo permite. Mira en el grafo dónde te metiste e inicia otro intento." />
         )}
-        <SimBoard
+        <SimBoard permitir3d
           board={board} prev={prevBoard} disabled={session !== 'jugando'}
           selected={selected} onSelect={i => { setSelected(i); setErrorCell(null) }}
-          onMove={handleMove} onInvalid={handleInvalid} errorCell={errorCell} />
+          onMove={handleMove} onInvalid={handleInvalid} errorCell={errorCell} cubeActions={cubeActions} />
         {/* Jugada rechazada: se dice qué regla se rompió y se anima, igual que
             en el tutorial. Antes solo aparecía una línea fina bajo el tablero. */}
         {fallo && session === 'jugando' ? (

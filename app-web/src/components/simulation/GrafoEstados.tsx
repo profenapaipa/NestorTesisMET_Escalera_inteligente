@@ -188,7 +188,35 @@ type Props = {
   figura?: { titulo: string; subtitulo?: string; archivo?: string }
 }
 
-function GrafoEstados({ pares, previos, actual, height, terminado = false, seguimiento = true, modo = 'juego', onCy, figura }: Props) {
+// Rendimiento (T-013, parte B, 2026-11-24): el grafo se actualizaba en el
+// mismo turno que la jugada y Cytoscape bloqueaba el hilo principal (medido:
+// cuadros de ~353 ms, 6,5 s con la CPU ×4), cortando la animación del tablero.
+// Se aplaza la actualización hasta que termina la animación de la jugada
+// (~240 ms) y el navegador queda libre; jugadas seguidas se agrupan en una sola
+// actualización. El tablero responde al instante; el grafo, un momento después.
+const ESPERA_GRAFO_MS = 280
+function useDiferido<T>(valor: T, ms: number): T {
+  const [diferido, setDiferido] = useState(valor)
+  useEffect(() => {
+    if (valor === diferido) return
+    let idle = 0
+    const t = window.setTimeout(() => {
+      const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+      if (ric) idle = ric(() => setDiferido(valor), { timeout: 400 })
+      else setDiferido(valor)
+    }, ms)
+    return () => {
+      window.clearTimeout(t)
+      const cic = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback
+      if (idle && cic) cic(idle)
+    }
+  }, [valor, diferido, ms])
+  return diferido
+}
+
+function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height, terminado = false, seguimiento = true, modo = 'juego', onCy, figura }: Props) {
+  const previos = useDiferido(previosVivos, ESPERA_GRAFO_MS)
+  const actual = useDiferido(actualVivo, ESPERA_GRAFO_MS)
   const graph = useMemo(() => buildStateGraph(pares), [pares])
   const boxRef = useRef<HTMLDivElement>(null)
   // Zoom con el que se ve todo el grafo (base de la escala) y si la persona ya

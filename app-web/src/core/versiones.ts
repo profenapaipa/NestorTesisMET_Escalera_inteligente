@@ -30,6 +30,20 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.0', fecha: '2026-11-23', publica: true,
+    titulo: 'Tablero 3D realista y órdenes con confirmación',
+    cambios: 'Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían.',
+    detalle: [
+      n('Vista 3D del tablero con perspectiva de cámara central, luz y sombras realistas, acabados MDF (predeterminado) y Minimalista. La vista 2D sigue disponible en el mismo selector.'),
+      n('La vista 3D también en Simulación libre, Control simulado y Tutorial: los cubos se mueven con clic sobre el 3D.'),
+      n('Señales PPA en 3D: el cubo se ilumina con el color de la fase, vibra con el patrón programado y su LED emite un cono de luz; la jugada inválida se ve en naranja.'),
+      n('Cubo desconectado: flota sobre su casilla con su sombra, y encaja en la base al conectarse.'),
+      c('Una orden al maestro (color o señal PPA) podía perderse sin aviso si su respuesta llegaba incompleta. Ahora cada orden lleva un número, queda pendiente hasta que el maestro la confirma y se reenvía; si nunca se confirma, queda registrada.'),
+      m('Al reconectarse un cubo, recibe su último color o señal sostenida, aunque haya pasado tiempo.'),
+      m('Compatibilidad: el firmware v3 publicado sigue funcionando igual; la confirmación se activa con el maestro v4.'),
+    ],
+  },
+  {
     version: '0.13.0', fecha: '2026-11-23', publica: true,
     titulo: 'Enlace confiable con el maestro y pausa técnica',
     cambios: 'El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una.',

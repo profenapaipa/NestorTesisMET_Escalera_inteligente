@@ -73,28 +73,74 @@ app.use(express.json())
 app.use(logger('dev'))
 app.use(cors())
 
-// Cola de comandos pendientes para el maestro. Antes era un único objeto
-// (cuboModificado) que se sobrescribía en cada emit — si el frontend
-// mandaba varios comandos casi seguidos (p. ej. una señal a "todos los
-// cubos"), los anteriores se perdían antes de que el maestro llegara a
-// pedirlos. /api/obtenerComando ahora drena la cola completa en cada
-// llamada, así que ningún comando se pierde por una ráfaga.
-let comandoQueue = [];
-// Instante (ms) en que entró cada orden de la cola, en paralelo con
-// comandoQueue, para medir la latencia orden→cubo (2026-11-20). Las órdenes
-// se envían al maestro sin modificar; la marca vive solo aquí.
-let comandoQueueT = [];
+// ── Órdenes para el maestro, con confirmación (T-014, 2026-11-23) ──
+// Antes (T-013, Parte A, reproducido) /api/obtenerComando VACIABA la cola antes
+// de responder: si la respuesta llegaba cortada o el maestro no la procesaba,
+// la orden (color, señal PPA, efecto) se perdía sin aviso.
+// Protocolo nuevo, compatible hacia atrás:
+//  - Cada orden recibe un `oid` creciente (1, 2, 3…) y queda PENDIENTE hasta que
+//    el maestro confirme con `ack` = último oid aplicado (GET siguiente, o POST de
+//    posiciones). Las no confirmadas se reenvían en cada GET con el MISMO oid; el
+//    maestro es idempotente (no repite lo ya aplicado: oid <= su último oid).
+//  - `ack` va acompañado de `e`, la época de este backend (la respuesta la trae):
+//    si el backend se reinicia, sus oid vuelven a 1 y el ack viejo no vale (e no
+//    coincide → ack efectivo 0). Un maestro nuevo (arranque nuevo) manda ack=0.
+//  - Sin el parámetro `ack` (maestro v3, o v4 anterior a T-014) se conserva el
+//    comportamiento de siempre: se drena todo y las órdenes salen sin oid.
+//  - Acotado: lote máximo por GET; si hay más de COLAPSO_UMBRAL pendientes se
+//    colapsan las reemplazables (se conserva la última por cubo y tipo); tope duro.
+//  - Una orden enviada y no confirmada tras ORDEN_MAX_REENVIOS envíos o
+//    ORDEN_MAX_EDAD_MS desde el primero se registra como `orden_no_confirmada`
+//    en la bitácora de enlace y se retira: nunca desaparece en silencio.
+const LOTE_MAX = 16
+const COLAPSO_UMBRAL = 32
+const PENDIENTES_MAX = 500
+const ORDEN_MAX_REENVIOS = Number(process.env.ORDEN_MAX_REENVIOS) || 10
+const ORDEN_MAX_EDAD_MS = Number(process.env.ORDEN_MAX_EDAD_MS) || 30000
+const EPOCA = Date.now()
+let ordenes = []        // { oid, cmd, t, envios, primero }
+let ultimoOid = 0
+const contOrdenes = { emitidas: 0, confirmadas: 0, reenviadas: 0, colapsadas: 0, noConfirmadas: 0 }
 let comandoGlobal = null;
 
-// Espera de cada orden en la cola hasta que el maestro la recoge
+// Espera de cada orden en la cola hasta que el maestro la recoge por primera vez
 // (/api/obtenerComando). Sumada a la mitad del eco maestro↔cubo (PG/PO,
 // telemetría de cada cubo) da la latencia de la orden hasta el cubo, el
 // sentido inverso al de la prueba de banco cubo→pantalla. Se guarda en
 // bitacoras/latencias-orden.jsonl y se resume en /api/latenciasOrden.
 const latenciasOrden = []
+function claveOrden(c) {
+  if (!c || typeof c !== 'object') return null
+  if (c.mensaje != null) return `m:${c.mensaje}`
+  return `${c.efecto != null ? 'ef' : 'es'}:${c.id ?? '*'}`
+}
+function retirarNoConfirmada(o, motivo, ahora) {
+  contOrdenes.noConfirmadas++
+  guardarEnDisco('enlace', { registro: 'orden_no_confirmada', oid: o.oid, motivo, envios: o.envios,
+    edadMs: ahora - (o.primero ?? o.t), orden: o.cmd })
+  console.log(`Orden ${o.oid} no confirmada (${motivo}, ${o.envios} envíos): retirada`)
+}
 function encolar(cmd) {
-  comandoQueue.push(cmd)
-  comandoQueueT.push(Date.now())
+  ordenes.push({ oid: ++ultimoOid, cmd, t: Date.now(), envios: 0, primero: null })
+  if (ordenes.length > COLAPSO_UMBRAL) {
+    // Reemplazables: de cada (cubo, tipo) solo la última; el orden se conserva.
+    const vistas = new Set(), conservar = new Array(ordenes.length).fill(true)
+    for (let i = ordenes.length - 1; i >= 0; i--) {
+      const k = claveOrden(ordenes[i].cmd)
+      if (k === null) continue
+      if (vistas.has(k)) { conservar[i] = false; contOrdenes.colapsadas++ } else vistas.add(k)
+    }
+    ordenes = ordenes.filter((_, i) => conservar[i])
+  }
+  while (ordenes.length > PENDIENTES_MAX) retirarNoConfirmada(ordenes.shift(), 'desborde', Date.now())
+}
+// El maestro confirma: se retiran las órdenes con oid <= ack. Un ack duplicado
+// o viejo no retira nada; uno de otra época (backend reiniciado) vale 0.
+function aplicarAck(ack, epoca) {
+  const ackEf = Number(epoca) === EPOCA ? Math.min(ack, ultimoOid) : 0
+  const n = ordenes.length
+  ordenes = ordenes.filter(o => o.oid > ackEf)
+  contOrdenes.confirmadas += n - ordenes.length
 }
 
 let lastBaseSeen = 0;
@@ -291,23 +337,43 @@ app.get("/api/obtenerComando", (req, res) => {
     if (Number.isSafeInteger(q) && q >= 0) e.descartesCola = Math.max(e.descartesCola, q)
   }
   markBaseActivity();
-  // Drena toda la cola de una vez (Node es de un solo hilo: no hay
-  // condición de carrera entre este drenado y los push() de comandoCubo).
-  const comandos = comandoQueue;
-  const tiempos = comandoQueueT;
-  comandoQueue = [];
-  comandoQueueT = [];
   const ahora = Date.now();
-  comandos.forEach((c, i) => {
-    const esperaMs = ahora - (tiempos[i] ?? ahora);
-    const tipo = c?.efecto != null ? `EF=${c.efecto}` : c?.mensaje ?? (c?.color ? 'M=' : 'otro');
-    latenciasOrden.push(esperaMs);
-    if (latenciasOrden.length > 2000) latenciasOrden.shift();
-    guardarEnDisco('latencias-orden', { tipo, cubo: c?.id ?? null, esperaColaMs: esperaMs });
-  });
+  const ack = Number(req.query.ack)
+  if (req.query.ack === undefined || !Number.isSafeInteger(ack) || ack < 0) {
+    // Maestro v3 (sin ack): comportamiento de siempre, se drena todo, sin oid.
+    const lote = ordenes
+    ordenes = []
+    lote.forEach(o => registrarEspera(o, ahora))
+    return res.json({ comandos: lote.map(o => o.cmd), s: Date.now() })
+  }
+  aplicarAck(ack, req.query.e)
+  // Las enviadas que siguen sin confirmar demasiado tiempo/veces se registran y retiran.
+  ordenes = ordenes.filter(o => {
+    if (o.envios === 0) return true
+    const motivo = o.envios >= ORDEN_MAX_REENVIOS ? 'reenvios' : (ahora - o.primero > ORDEN_MAX_EDAD_MS ? 'tiempo' : null)
+    if (motivo === null) return true
+    retirarNoConfirmada(o, motivo, ahora)
+    return false
+  })
+  const lote = ordenes.slice(0, LOTE_MAX)
+  for (const o of lote) {
+    if (o.envios === 0) { o.primero = ahora; registrarEspera(o, ahora) } else contOrdenes.reenviadas++
+    o.envios++
+  }
   // s: hora del backend, para que el maestro cierre el intercambio del reloj común.
-  res.json({ comandos, s: Date.now() });
+  // e: época de este backend (el maestro la devuelve junto con su ack).
+  res.json({ comandos: lote.map(o => ({ ...(typeof o.cmd === 'object' && o.cmd ? o.cmd : {}), oid: o.oid })), s: Date.now(), e: EPOCA });
 });
+
+function registrarEspera(o, ahora) {
+  contOrdenes.emitidas++
+  const c = o.cmd
+  const esperaMs = ahora - o.t;
+  const tipo = c?.efecto != null ? `EF=${c.efecto}` : c?.mensaje ?? (c?.color ? 'M=' : 'otro');
+  latenciasOrden.push(esperaMs);
+  if (latenciasOrden.length > 2000) latenciasOrden.shift();
+  guardarEnDisco('latencias-orden', { tipo, cubo: c?.id ?? null, esperaColaMs: esperaMs, oid: o.oid });
+}
 
 // Resumen de la espera en cola (ms) de las últimas órdenes entregadas.
 app.get("/api/latenciasOrden", (req, res) => {
@@ -346,7 +412,8 @@ app.post('/api/esclavosConectados', (req, res) => {
 
 // Estado del enlace con el maestro: copias, faltantes, tardías y reloj.
 app.get('/api/enlace', (req, res) => {
-  res.json({ vigente: arranqueVigente, enlaces: [...enlaces.values()].map(resumenEnlace) })
+  res.json({ vigente: arranqueVigente, enlaces: [...enlaces.values()].map(resumenEnlace),
+    ordenes: { pendientes: ordenes.length, ultimoOid, epoca: EPOCA, ...contOrdenes } })
 })
 
 app.post('/api/posiciones', (req, res) => {
@@ -365,6 +432,8 @@ app.post('/api/posiciones', (req, res) => {
     }
     markBaseActivity();
     const e = estadoEnlace(arranque)
+    // El maestro también puede confirmar sus órdenes en el POST de posiciones.
+    if (Number.isSafeInteger(Number(req.body.ack)) && Number(req.body.ack) >= 0 && req.body.ack !== null) aplicarAck(Number(req.body.ack), req.body.e)
     const f = Number(req.body.fallos)
     if (Number.isSafeInteger(f) && f >= 0) e.fallosMaestro = Math.max(e.fallosMaestro, f)
     if (e.ultimoSeq !== null && seq <= e.ultimoSeq) {

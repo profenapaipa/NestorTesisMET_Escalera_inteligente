@@ -1,0 +1,263 @@
+.tablero-mode-controls,
+.tablero-mode-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tablero-mode-controls {
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 3px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, .16);
+}
+
+.tablero-mode-button {
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--color-paper-dim);
+  font: 600 11px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.tablero-mode-button[aria-pressed="true"] {
+  border-color: var(--color-line-strong);
+  background: var(--color-blue);
+  color: #fff;
+}
+
+.tablero-mode-button:focus-visible {
+  outline: 3px solid var(--color-focus, #5fd4ff);
+  outline-offset: 2px;
+}
+
+.tablero3d-viewport {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden; /* sin barra horizontal: la escena se escala al ancho (Tablero3D.tsx) */
+  padding: 8px 0 10px;
+}
+
+/* Escena: un solo SVG con la bandeja, las ranuras y los cubos proyectados con una
+   cámara estenopeica (ver proyeccion3d.ts). Los elementos HTML encima solo llevan
+   los números, la presencia/batería y las áreas de clic. */
+.tablero3d-stage {
+  position: relative;
+  box-sizing: border-box;
+  width: 1020px;
+  height: 290px;
+  margin-inline: auto;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 76%, rgba(123, 137, 151, .14), transparent 62%);
+}
+
+.tablero3d-svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tablero3d-slot {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  height: 290px;
+  transition: opacity 180ms ease;
+}
+
+.tablero3d-slot.is-outside-level .tablero3d-position-label { opacity: .24; }
+
+.tablero3d-position-label {
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: 5px;
+  left: 0;
+  color: var(--color-paper);
+  font: 600 12px/1 var(--font-mono);
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* Área de clic del cubo (transparente); el dibujo está en el SVG. */
+.tablero3d-cube {
+  position: absolute;
+  z-index: 4;
+  cursor: pointer;
+  background: transparent;
+}
+
+/* Zona de clic de una ranura vacía (solo en simulación). */
+.tablero3d-hit {
+  position: absolute;
+  z-index: 3;
+  cursor: pointer;
+  background: transparent;
+}
+
+.tablero3d-presence {
+  position: absolute;
+  z-index: 5;
+  bottom: 22px;
+  left: 50%;
+  width: 22px;
+  height: 5px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+
+.tablero3d-presence.is-present { background: var(--color-blue); }
+
+.tablero3d-battery {
+  position: absolute;
+  z-index: 5;
+  bottom: 15px;
+  left: 50%;
+  width: 22px;
+  height: 3px;
+  overflow: hidden;
+  border: 1px solid var(--color-line-strong);
+  transform: translateX(-50%);
+}
+
+.tablero3d-battery > i { display: block; height: 100%; background: var(--color-online); }
+
+.tablero3d-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Las animaciones son de JavaScript (requestAnimationFrame); con movimiento
+   reducido Tablero3D.tsx no interpola: todo cambia de inmediato. */
+@media (prefers-reduced-motion: reduce) {
+  .tablero3d-viewport,
+  .tablero3d-viewport * {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Leyenda «Colores del LED del cubo» (LeyendaLED.tsx): línea compacta + diálogo con la leyenda completa. */
+.leyenda-led { margin: 4px 0 2px; color: var(--color-paper, #e7edee); }
+
+.leyenda-led__barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+  font: 500 11px/1.3 var(--font-sans, sans-serif);
+  color: var(--color-paper-dim, #aab4bd);
+}
+
+.leyenda-led__muestra { display: inline-flex; gap: 4px; align-items: center; }
+.leyenda-led__muestra i { width: 10px; height: 10px; border: 1px solid rgba(255, 255, 255, .55); border-radius: 50%; }
+
+.leyenda-led__boton {
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid var(--color-line-strong, rgba(231, 237, 238, .3));
+  border-radius: var(--radius, 6px);
+  background: transparent;
+  color: var(--color-paper-dim, #aab4bd);
+  font: 600 11px/1 var(--font-sans, sans-serif);
+  cursor: pointer;
+}
+
+.leyenda-led__boton:focus-visible { outline: 3px solid var(--color-focus, #5fd4ff); outline-offset: 2px; }
+
+/* Ventana modal centrada (el reset de Tailwind quita el margin:auto del navegador, por eso se fija aquí). Es la única
+   excepción a «sin barras internas»: con 14 estados no cabe entera en un celular bajo; la rejilla se compacta antes. */
+.leyenda-led__dialogo {
+  position: fixed;
+  inset: 0;
+  width: min(94vw, 1000px);
+  max-height: 94vh;
+  height: fit-content;
+  margin: auto;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--color-line-strong, rgba(231, 237, 238, .3));
+  border-radius: var(--radius, 6px);
+  background: var(--color-panel, #12181f);
+  color: var(--color-paper, #e7edee);
+}
+
+.leyenda-led__dialogo::backdrop { background: rgba(0, 0, 0, .66); }
+.leyenda-led__contenido { position: relative; padding: 14px 16px 12px; }
+.leyenda-led__contenido h2 { margin: 0 52px 0 0; font: 700 15px/1.3 var(--font-sans, sans-serif); }
+
+.leyenda-led__x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-line-strong, rgba(231, 237, 238, .3));
+  border-radius: var(--radius, 6px);
+  background: transparent;
+  color: var(--color-paper, #e7edee);
+  font: 400 26px/1 var(--font-sans, sans-serif);
+  cursor: pointer;
+}
+
+.leyenda-led__x:focus-visible { outline: 3px solid var(--color-focus, #5fd4ff); outline-offset: 2px; }
+.leyenda-led__pie { display: flex; justify-content: flex-end; margin-top: 10px; }
+.leyenda-led__boton--cerrar { min-height: 44px; padding: 6px 18px; font-size: 13px; }
+
+.leyenda-led__nota {
+  margin: 6px 0 4px;
+  color: var(--color-paper-dim, #aab4bd);
+  font: 400 12px/1.4 var(--font-sans, sans-serif);
+}
+
+.leyenda-led__grupo { margin-top: 8px; }
+.leyenda-led__grupo h3 { margin: 0 0 2px; color: var(--color-paper-dim, #aab4bd); font: 700 11px/1.3 var(--font-sans, sans-serif); letter-spacing: .06em; text-transform: uppercase; }
+
+.leyenda-led__lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 0 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leyenda-led__fila {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+  font: 400 11px/1.3 var(--font-sans, sans-serif);
+}
+
+.leyenda-led__fila p { margin: 2px 0; }
+.leyenda-led__fila strong { margin-right: 6px; font-size: 12px; }
+.leyenda-led__fila small { color: var(--color-paper-dim, #aab4bd); font-size: 11px; }
+.leyenda-led__rgb { font: 500 11px/1.3 var(--font-mono, monospace); color: var(--color-paper-dim, #aab4bd); }
+.leyenda-led__cubo { flex: none; width: 70px; height: auto; }
+@media (max-width: 520px) {
+  .leyenda-led__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 6px; }
+  .leyenda-led__cubo { width: 50px; }
+  .leyenda-led__fila { font-size: 10px; }
+  .leyenda-led__rgb { display: none; }
+  .leyenda-led__nota { display: none; }
+  .leyenda-led__contenido { padding: 10px 10px 8px; }
+}

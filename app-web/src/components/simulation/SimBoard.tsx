@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { type Board, legalMovesFor } from '../../core/simulation/laEscaleraRules'
-import { PPA_HEX, type PPAPhase } from '../../core/ppa/ppaColors'
+import { PPA_HEX, INVALIDO_HEX, type PPAPhase } from '../../core/ppa/ppaColors'
 import { TEAM_HEX } from '../../ui/styles'
+import Tablero3D, { type AcabadoTablero3D } from '../control/Tablero3D'
+import type { CeldaTablero } from '../control/TableroFisico'
 
 // Tablero de la simulación, compartido por el tutorial, la práctica libre
 // y el control simulado. Dos formas de mover, para que sirva igual a un
@@ -21,7 +23,10 @@ export type BoardHint = { from: number; to: number } | null
 function SimBoard({
   board, disabled = false, selected, onSelect, onMove, onInvalid, onTapPiece,
   hint = null, errorCell = null, showArrows = false, showLegalTargets = true, cubeActions, prev = null,
+  permitir3d = false,
 }: {
+  // Muestra el selector 2D/3D (Simulación libre y Control simulado). Por omisión 3D MDF; 2D queda en el selector.
+  permitir3d?: boolean
   board: Board
   // Tablero anterior: la Regla 2 (no volver a la posición inmediatamente
   // anterior) depende de él.
@@ -39,6 +44,48 @@ function SimBoard({
   cubeActions?: Record<number, PPAPhase>
 }) {
   const [drag, setDrag] = useState<DragState | null>(null)
+  // Preferencia visual (2D por omisión), con try/catch por si el navegador bloquea el almacenamiento.
+  const [vista, setVista] = useState<'2d' | '3d'>(() => {
+    try { return localStorage.getItem('escalera:sim:vista-tablero.v2') === '2d' ? '2d' : '3d' }
+    catch { return '3d' }
+  })
+  const [acabado, setAcabado] = useState<AcabadoTablero3D>(() => {
+    try { return localStorage.getItem('escalera:sim:acabado-tablero-3d.v2') === 'minimalista' ? 'minimalista' : 'mdf' }
+    catch { return 'mdf' }
+  })
+  // Jugada inválida: el cubo implicado se enciende de naranja 1 s (EF=3 del firmware, como en Control).
+  const [flashId, setFlashId] = useState<number | null>(null)
+  const flashTimer = useRef(0)
+  useEffect(() => () => window.clearTimeout(flashTimer.current), [])
+  useEffect(() => {
+    try {
+      localStorage.setItem('escalera:sim:vista-tablero.v2', vista)
+      localStorage.setItem('escalera:sim:acabado-tablero-3d.v2', acabado)
+    } catch { /* funciona igual sin almacenamiento */ }
+  }, [vista, acabado])
+  // «Buscar conexión» simulado: los cubos se ponen magenta y flotan, y se van conectando y encajando uno a uno con un
+  // retraso breve y aleatorio (práctica y demostración; no envía nada al hardware).
+  const [busca, setBusca] = useState<{ conectados: number[] } | null>(null)
+  const [avisoBusca, setAvisoBusca] = useState('')
+  const timersBusca = useRef<number[]>([])
+  useEffect(() => () => timersBusca.current.forEach(window.clearTimeout), [])
+  const idsTablero = board.flatMap(c => (c ? [c.id] : []))
+  function buscarConexionSimulada() {
+    timersBusca.current.forEach(window.clearTimeout)
+    const ids = [...idsTablero]
+    setBusca({ conectados: [] })
+    setAvisoBusca('Buscando conexión…')
+    timersBusca.current = ids.map(id => window.setTimeout(() => {
+      setBusca(b => {
+        if (!b) return b
+        const conectados = [...b.conectados, id]
+        if (conectados.length >= ids.length) {
+          window.setTimeout(() => { setBusca(null); setAvisoBusca(`Búsqueda terminada: ${ids.length} de ${ids.length} cubos conectados`) }, 700)
+        } else setAvisoBusca(`Buscando conexión… ${conectados.length} de ${ids.length} cubos conectados`)
+        return { conectados }
+      })
+    }, 500 + Math.random() * 3500))
+  }
   const cellRefs = useRef<(HTMLDivElement | null)[]>([])
   const rects = useRef<(DOMRect | null)[]>([])
 
@@ -68,7 +115,26 @@ function SimBoard({
   function attempt(from: number, to: number) {
     const legal = board[to] === null && legalMovesFor(board, from, prev).includes(to)
     if (legal) onMove(from, to)
-    else onInvalid(from, to)
+    else {
+      const id = board[from]?.id ?? null
+      if (id !== null) {
+        setFlashId(id)
+        window.clearTimeout(flashTimer.current)
+        flashTimer.current = window.setTimeout(() => setFlashId(null), 1000)
+      }
+      onInvalid(from, to)
+    }
+  }
+
+  // Toque en una casilla de la vista 3D: exactamente lo mismo que un toque sin arrastre en 2D.
+  function tocarCasilla(index: number) {
+    if (disabled) return
+    if (!board[index]) {
+      if (selected !== null) attempt(selected, index)
+      return
+    }
+    onTapPiece?.(index)
+    onSelect(selected === index ? null : index)
   }
 
   function finishDrag(from: number, to: number, outcome: 'move' | 'invalid' | 'cancel') {
@@ -180,8 +246,54 @@ function SimBoard({
     )
   }
 
+  const en3d = permitir3d && vista === '3d'
+  const celdas3d: CeldaTablero[] = board.map((cell, i) => cell
+    ? { id: cell.id, visual: cell.id === flashId ? { hex: INVALIDO_HEX, pulso: true as const } : { hex: TEAM_HEX[cell.team], accion: cubeActions?.[cell.id] }, conectado: !busca || busca.conectados.includes(cell.id) }
+    : { id: 0, visual: { hex: EMPTY_HEX }, legal: (showLegalTargets && legalTargets.includes(i)) || hint?.to === i })
+
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
+      {permitir3d && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
+          <div className="tablero-mode-controls" aria-label="Representación del tablero">
+            <div className="tablero-mode-group" role="group" aria-label="Vista">
+              <button type="button" className="tablero-mode-button" aria-pressed={vista === '2d'} onClick={() => setVista('2d')}>2D</button>
+              <button type="button" className="tablero-mode-button" aria-pressed={vista === '3d'} onClick={() => setVista('3d')}>3D</button>
+            </div>
+            {vista === '3d' && (
+              <div className="tablero-mode-group" role="group" aria-label="Conexión de los cubos">
+                <button type="button" className="tablero-mode-button" disabled={busca !== null} onClick={buscarConexionSimulada}>
+                  {busca ? 'Buscando conexión…' : 'Buscar conexión'}
+                </button>
+                <span role="status" aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>{avisoBusca}</span>
+              </div>
+            )}
+            {vista === '3d' && (
+              <div className="tablero-mode-group" role="group" aria-label="Acabado de la base 3D">
+                <button type="button" className="tablero-mode-button" aria-pressed={acabado === 'minimalista'} onClick={() => setAcabado('minimalista')}>Minimalista</button>
+                <button type="button" className="tablero-mode-button" aria-pressed={acabado === 'mdf'} onClick={() => setAcabado('mdf')}>MDF</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {en3d ? (
+        <div data-testid="sim-board-3d">
+          <Tablero3D
+            celdas={celdas3d}
+            primeraCasilla={Math.max(0, Math.floor((11 - board.length) / 2))}
+            levantados={selected !== null && board[selected]
+              ? [{ id: board[selected]!.id, origen: selected, visual: celdas3d[selected].visual }]
+              : []}
+            seleccionado={selected !== null ? board[selected]?.id ?? null : null}
+            mostrarConexion={busca !== null}
+            buscando={busca !== null}
+            acabado={acabado}
+            equipoDe={id => (board.find(c => c?.id === id)?.team ?? 'A')}
+            onCasilla={tocarCasilla}
+            ajuste={availW > 0 ? Math.min(1, availW / 1020) : undefined} />
+        </div>
+      ) : (<>
       <div style={{ display: 'flex', gap: `${Math.round(6 * scale)}px`, flexWrap: 'nowrap', overflowX: 'auto', justifyContent: 'center', padding: '8px 4px', touchAction: 'none' }}>
         {board.map((_, i) => (
           <div key={i} data-cell={i}
@@ -195,6 +307,7 @@ function SimBoard({
           </div>
         ))}
       </div>
+      </>)}
 
       {drag && board[drag.fromIndex] && rects.current[drag.fromIndex] && (() => {
         const r = rects.current[drag.fromIndex]!

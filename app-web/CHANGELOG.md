@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.0** | 2026-11-23 | Tablero 3D realista y órdenes con confirmación | Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían. |
 | **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
 | **0.12.3** | 2026-11-21 | El juego al centro de la atención | Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado. |
 | **0.12.2** | 2026-11-21 | Logo oficial en la pestaña del navegador | La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular. |
@@ -38,6 +39,11 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:fin -->
 
 
+## 0.14.0 · 2026-11-23 · tablero 3D realista y órdenes con confirmación
+
+- **Vista 3D del tablero:** perspectiva de cámara central, luz y sombras realistas, y acabados MDF (predeterminado) y Minimalista; la 2D sigue disponible en el mismo selector. También en Simulación libre, Control simulado y Tutorial, donde los cubos se mueven con clic sobre el 3D.
+- **Luces como el cubo real:** en las señales PPA, el cubo se ilumina con el color de la fase, vibra con su patrón programado y su LED emite un cono de luz; la jugada inválida se ve en naranja; el cubo desconectado flota y encaja al conectarse.
+- **Corrección: órdenes perdidas.** Si una respuesta al maestro llegaba incompleta, sus órdenes se perdían sin aviso. Ahora cada orden lleva un número (`oid`), queda pendiente hasta la confirmación (`ack`) del maestro y se reenvía; si no se confirma tras 10 envíos o 30 s, se registra como `orden_no_confirmada`. Compatible con el firmware v3, que sigue funcionando como antes.
 ## 0.13.0 · 2026-11-23 · enlace confiable con el maestro y pausa técnica
 
 - **Corrección: jugadas duplicadas.** Una jugada que llegaba dos veces sumaba dos movimientos y duplicaba su marcador EEG. Ahora cada envío del maestro lleva un número de arranque y de secuencia, y el servidor y la pantalla descartan las copias.
