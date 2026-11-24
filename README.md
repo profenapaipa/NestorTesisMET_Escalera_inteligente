@@ -2,7 +2,7 @@
 
 Herramienta híbrida físico-virtual del juego **La Escalera** (salto de la rana): un tablero de cubos inteligentes (ESP32) y una aplicación web. Las dos comparten el mismo motor de reglas, el grafo del espacio del problema en vivo, las métricas de trayectoria y un protocolo de mediación Pausar–Pensar–Actuar bajo control Mago de Oz.
 
-**Versión actual: 0.14.0** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
+**Versión actual: 0.14.1** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
 
 **Pruébala en el navegador, sin instalar nada:** https://profenapaipa.github.io/NestorTesisMET_Escalera_inteligente/
 
@@ -50,6 +50,7 @@ El software se ha desarrollado y mejorado por etapas. Cada informe, sesión y pa
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
 | **0.14.0** | 2026-11-23 | Tablero 3D realista y órdenes con confirmación | Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían. |
 | **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
 | **0.12.3** | 2026-11-21 | El juego al centro de la atención | Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado. |

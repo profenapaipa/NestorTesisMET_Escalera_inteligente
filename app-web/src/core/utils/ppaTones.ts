@@ -7,6 +7,8 @@ function getCtx(): AudioContext {
   if (sharedCtx.state === 'suspended') void sharedCtx.resume()
   return sharedCtx
 }
+/** El mismo contexto para otros sonidos de la app (p. ej. el encaje de los cubos). */
+export const audioCompartido = getCtx
 
 export function playTone(freq: number, duration: number, gain = 0.35) {
   try {

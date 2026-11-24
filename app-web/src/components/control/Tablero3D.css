@@ -261,3 +261,16 @@
   .leyenda-led__nota { display: none; }
   .leyenda-led__contenido { padding: 10px 10px 8px; }
 }
+
+/* Marco del tablero: solo posiciona el botón de sonido sobre la escena, sin cambiar el diseño. */
+.tablero3d-marco { position: relative; width: 100%; min-width: 0; }
+.tablero3d-sonido {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid var(--color-line-strong, rgba(255,255,255,.18));
+  background: rgba(11, 15, 16, .55); color: var(--color-paper-dim, #b9c3c6);
+  cursor: pointer; opacity: .7; transition: opacity .15s, color .15s;
+}
+.tablero3d-sonido:hover, .tablero3d-sonido:focus-visible { opacity: 1; color: var(--color-paper, #e7edee); }
+.tablero3d-sonido:focus-visible { outline: 2px solid var(--color-blue, #4589ff); outline-offset: 2px; }
+.tablero3d-sonido.is-off { color: var(--color-paper-faint, #7c878a); }

@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { PPA_RGB, PPA_TEXT, PPA_VIBRATION, PPA_VIB_PATTERN, INVALIDO_HEX, type PPAPhase } from '../../core/ppa/ppaColors'
 import type { CeldaTablero, CuboLevantado, CubeVisual } from './TableroFisico'
 import {
@@ -7,6 +7,8 @@ import {
   type Camara, type CaraRol, type Escena, type RolBandeja, type Vec3,
 } from './proyeccion3d'
 import LeyendaLED from './LeyendaLED'
+import { Volume2, VolumeX } from 'lucide-react'
+import { playEncaje, sonidoEncajeActivo, fijarSonidoEncaje, suscribirSonidoEncaje } from '../../core/utils/sonidoEncaje'
 import './Tablero3D.css'
 
 export type AcabadoTablero3D = 'minimalista' | 'mdf'
@@ -111,7 +113,6 @@ function coloresCubo(luz: Luz | null, tono: TonoCubos, led: number, equipo: 'A' 
 /* ---------- Reloj de vibración: solo corre mientras hay señal PPA ---------- */
 
 type Pulso = { k: number; dx: number; dy: number; on: boolean }
-const SIN_PULSOS: Record<number, Pulso> = {}
 const REDUCIDO = '(prefers-reduced-motion: reduce)'
 
 /** Estado del pulso de una fase a los `ms` de iniciada la señal. Mismo patrón y ciclo que el
@@ -140,37 +141,120 @@ function calcularPulso(patron: Patron, ms: number): Pulso {
   return { k, on, dx: amp * Math.sin(2 * Math.PI * 13 * t), dy: 0.6 * amp * Math.sin(2 * Math.PI * 17 * t + 1) }
 }
 
-function useRelojPulsos(senales: { id: number; fase: Patron }[]) {
-  const [pulsos, setPulsos] = useState<Record<number, Pulso>>(SIN_PULSOS)
-  const inicios = useRef(new Map<number, { fase: Patron; t0: number }>())
+/* Reloj compartido (optimización 2026-11-24): un solo requestAnimationFrame para todas las
+ * vibraciones, y cada cubo (y su haz) se suscribe por su cuenta. Antes el tablero entero se
+ * volvía a calcular cada 30 ms mientras hubiera una señal; ahora solo se redibuja lo que vibra. */
+const reloj = { t: 0, ultimo: 0, raf: 0, subs: new Set<() => void>() }
+function tic(t: number) {
+  reloj.raf = 0
+  if (t - reloj.ultimo >= 30) {
+    reloj.ultimo = t
+    reloj.t = t
+    for (const cb of [...reloj.subs]) cb()
+  }
+  if (reloj.subs.size) reloj.raf = requestAnimationFrame(tic)
+}
+function suscribirReloj(cb: () => void) {
+  reloj.subs.add(cb)
+  if (!reloj.raf) reloj.raf = requestAnimationFrame(tic)
+  return () => {
+    reloj.subs.delete(cb)
+    if (!reloj.subs.size && reloj.raf) { cancelAnimationFrame(reloj.raf); reloj.raf = 0 }
+  }
+}
+const sinSuscripcion = () => () => {}
+const leerReloj = () => reloj.t
+const esReducido = () => typeof window !== 'undefined' && window.matchMedia(REDUCIDO).matches
+
+/** Pulso de vibración de un cubo con señal `fase` iniciada en `t0`; solo este componente se actualiza. */
+function usePulso(fase: Patron | undefined, t0: number | undefined, id: number): Pulso | undefined {
+  const activo = fase !== undefined && t0 !== undefined && !esReducido()
+  const t = useSyncExternalStore(activo ? suscribirReloj : sinSuscripcion, leerReloj, leerReloj)
+  if (!activo) return undefined
+  return calcularPulso(fase, Math.max(0, t - t0) + id * 377)
+}
+
+type Inicio = { fase: Patron; t0: number }
+/** Momento en que empezó la señal de cada cubo. Cambia solo cuando aparece, cambia o se retira una
+ *  señal, así que las props de los cubos quietos no cambian y su memo los deja sin redibujar. */
+function useIniciosSenal(senales: { id: number; fase: Patron }[]): Record<number, Inicio> {
   const clave = senales.map(s => `${s.id}:${s.fase}`).join('|')
-  const reducido = typeof window !== 'undefined' && window.matchMedia(REDUCIDO).matches
-  useEffect(() => {
-    const mapa = inicios.current
-    if (!clave || window.matchMedia(REDUCIDO).matches) { mapa.clear(); return }
+  const [estado, setEstado] = useState<{ clave: string; mapa: Record<number, Inicio> }>({ clave: '', mapa: {} })
+  if (estado.clave !== clave) {
     const ahora = performance.now()
-    const vivas = new Set<number>()
-    for (const par of clave.split('|')) {
+    const mapa: Record<number, Inicio> = {}
+    for (const par of clave ? clave.split('|') : []) {
       const [id, fase] = par.split(':')
-      vivas.add(Number(id))
-      if (mapa.get(Number(id))?.fase !== fase) mapa.set(Number(id), { fase: fase as Patron, t0: ahora })
+      const previo = estado.mapa[Number(id)]
+      mapa[Number(id)] = previo && previo.fase === fase ? previo : { fase: fase as Patron, t0: ahora }
     }
-    for (const id of [...mapa.keys()]) if (!vivas.has(id)) mapa.delete(id)
-    let raf = 0
-    let ultimo = 0
-    const marco = (t: number) => {
-      if (t - ultimo >= 30) {
-        ultimo = t
-        const salida: Record<number, Pulso> = {}
-        for (const [id, s] of mapa) salida[id] = calcularPulso(s.fase, t - s.t0 + id * 377)
-        setPulsos(salida)
-      }
-      raf = requestAnimationFrame(marco)
+    setEstado({ clave, mapa })
+    return mapa
+  }
+  return estado.mapa
+}
+
+/* Textura del poro del MDF calculada UNA vez (antes, cada cubo generaba ruido con feTurbulence en
+ * cada repintado). Mismo grano y color que el filtro anterior: ruido fino de ≈ 1 px de la escena,
+ * color (0,2; 0,1; 0,03) y alfa = 1,5·n − 0,62, como su feColorMatrix. */
+let texturaCache: string | null | undefined
+function texturaPoro(): string | null {
+  if (texturaCache !== undefined) return texturaCache
+  texturaCache = null
+  if (typeof document === 'undefined') return null
+  try {
+    const n = 128
+    const lienzo = document.createElement('canvas')
+    lienzo.width = n
+    lienzo.height = n
+    const ctx = lienzo.getContext('2d')
+    if (!ctx) return null
+    const img = ctx.createImageData(n, n)
+    let s = 3 // semilla fija: la misma textura en cada carga
+    const azar = () => { s = (s * 16807) % 2147483647; return s / 2147483647 }
+    for (let k = 0; k < n * n; k++) {
+      const u = (azar() + azar() + azar()) / 3
+      const a = Math.min(1, Math.max(0, 1.5 * u - 0.62))
+      img.data.set([51, 26, 8, Math.round(a * 255)], k * 4)
     }
-    raf = requestAnimationFrame(marco)
-    return () => cancelAnimationFrame(raf)
-  }, [clave])
-  return clave && !reducido ? pulsos : SIN_PULSOS
+    ctx.putImageData(img, 0, 0)
+    texturaCache = lienzo.toDataURL('image/png')
+  } catch {
+    texturaCache = null
+  }
+  return texturaCache
+}
+
+/** Niveles de desenfoque de sombra compartidos (antes, dos filtros propios por cubo). */
+const NIVELES_SOMBRA = 10
+const nivelSombra = (alto: number) => Math.round(Math.min(1, Math.max(0, alto)) * NIVELES_SOMBRA)
+
+/** Definiciones comunes a todos los cubos de un dibujo: se crean una vez y cada cubo las usa. */
+const DefsCubos = memo(function DefsCubos({ uid }: { uid: string }) {
+  const tex = texturaPoro()
+  return (
+    <defs>
+      {tex
+        ? <pattern id={`${uid}-poro`} patternUnits="userSpaceOnUse" width="128" height="128"><image href={tex} width="128" height="128" /></pattern>
+        : <filter id={`${uid}-poroF`} x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n" />
+            <feColorMatrix in="n" type="matrix" values="0 0 0 0 .2  0 0 0 0 .1  0 0 0 0 .03  0 0 0 1.5 -.62" result="m" />
+            <feComposite in="m" in2="SourceGraphic" operator="in" />
+          </filter>}
+      {Array.from({ length: NIVELES_SOMBRA + 1 }, (_, i) => (
+        <filter key={i} id={`${uid}-sb${i}`} x="-40%" y="-120%" width="180%" height="340%"><feGaussianBlur stdDeviation={2 + (9 * i) / NIVELES_SOMBRA} /></filter>
+      ))}
+      <filter id={`${uid}-sp`} x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="3.4" /></filter>
+      <filter id={`${uid}-halo`} x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="5" /></filter>
+      <filter id={`${uid}-led`} x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2.2" /></filter>
+    </defs>
+  )
+})
+/** Relleno de poro sobre una cara: patrón compartido (o el filtro, si no hay lienzo). */
+function poroProps(uid: string, opacidad: number) {
+  return texturaPoro()
+    ? { fill: `url(#${uid}-poro)`, opacity: opacidad }
+    : { fill: '#2a1a0c', opacity: opacidad, filter: `url(#${uid}-poroF)` }
 }
 
 /* ---------- Animación: estado 3D interpolado con requestAnimationFrame ---------- */
@@ -472,7 +556,8 @@ type CuboProps = {
   tono: TonoCubos
   equipo: 'A' | 'B'
   luz: Luz | null
-  pulso?: Pulso
+  fase?: Patron
+  t0?: number
   E: Escena
 }
 
@@ -506,7 +591,16 @@ const TIPOS_CARA: Record<CaraRol, readonly ('c' | 'e')[]> = {
   'costado-der': ['e', 'e', 'e', 'e'],
 }
 
-function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, numero, mdf, tono, equipo, luz, pulso, E }: CuboProps) {
+// Cada cubo se redibuja solo si cambia lo suyo (T-015, propuesta 3 de Codex):
+// mientras uno vuela, los otros nueve no se recalculan. `luz` llega como
+// valores simples porque luzDe crea un objeto nuevo en cada cuadro.
+const CuboMemo = memo(function CuboMemo({ luzHex, luzPatron, ...props }: Omit<CuboProps, 'luz'> & { luzHex?: string; luzPatron?: Patron }) {
+  const luz = luzHex !== undefined && luzPatron !== undefined ? { hex: luzHex, patron: luzPatron } : null
+  return <Cubo {...props} luz={luz} />
+})
+
+function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, numero, mdf, tono, equipo, luz, fase, t0, E }: CuboProps) {
+  const pulso = usePulso(fase, t0, id)
   const { p } = E
   const poly = (v: readonly Vec3[]) => E.pts(v)
   const G = E.girar(X, elev, 0)
@@ -588,15 +682,6 @@ function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, 
           <stop offset="0" stopColor={aclarar(col.costado, 0.04)} />
           <stop offset="1" stopColor={oscurecer(col.costado, 0.28)} />
         </linearGradient>
-        <filter id={`${g}-sb`} x="-40%" y="-120%" width="180%" height="340%"><feGaussianBlur stdDeviation={2 + 9 * alto} /></filter>
-        <filter id={`${g}-sp`} x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation={3 + 14 * elev} /></filter>
-        <filter id={`${g}-poro`} x="0" y="0" width="100%" height="100%">
-          <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 .2  0 0 0 0 .1  0 0 0 0 .03  0 0 0 1.5 -.62" result="m" />
-          <feComposite in="m" in2="SourceGraphic" operator="in" />
-        </filter>
-        <filter id={`${g}-halo`} x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="5" /></filter>
-        <filter id={`${g}-led`} x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2.2" /></filter>
         <radialGradient id={`${g}-in`} cx=".5" cy=".42" r=".7">
           <stop offset="0" stopColor="#fff" stopOpacity=".34" />
           <stop offset=".6" stopColor="#fff" stopOpacity=".08" />
@@ -606,17 +691,17 @@ function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, 
 
       <g transform={dx0 || dy0 ? `translate(${(-dx0).toFixed(2)} ${(-dy0).toFixed(2)})` : undefined}>
         {elev > 0.06
-          ? <ellipse cx={sx} cy={sy} rx={rx} ry={ry} fill={sombraTinte} opacity={opElipse} filter={`url(#${g}-sb)`} />
-          : <polygon points={poly(sombraPlana)} fill={sombraTinte} opacity={Math.max(0.2, 0.62 - 1.1 * elev) * (mdf ? 0.45 : 1)} filter={`url(#${g}-sp)`} />}
+          ? <ellipse cx={sx} cy={sy} rx={rx} ry={ry} fill={sombraTinte} opacity={opElipse} filter={`url(#${uid}-sb${nivelSombra(alto)})`} />
+          : <polygon points={poly(sombraPlana)} fill={sombraTinte} opacity={Math.max(0.2, 0.62 - 1.1 * elev) * (mdf ? 0.45 : 1)} filter={`url(#${uid}-sp)`} />}
       </g>
 
       {hay && frente && (
-        <polygon points={poly(frente)} fill={hay.hex} opacity={0.38 * intensidad} filter={`url(#${g}-halo)`} />
+        <polygon points={poly(frente)} fill={hay.hex} opacity={0.38 * intensidad} filter={`url(#${uid}-halo)`} />
       )}
       {fondo && (
         <g data-cara="fondo">
           <polygon points={poly(fondo)} fill={oscurecer(col.frente, 0.2)} stroke={trazo} strokeWidth=".9" strokeLinejoin="round" />
-          {mdf && <polygon points={poly(fondo)} fill="#4a3018" opacity=".38" filter={`url(#${g}-poro)`} />}
+          {mdf && <polygon points={poly(fondo)} {...poroProps(uid, 0.38)} />}
           {mdf && dibujaLeng('fondo', fondo)}
           {/* Regleta de la cara inferior: horizontal, centrada, a ≈ 0,2 w del borde trasero. */}
           <Regleta E={E} m={(dx, dz, l) => G.pt(dx, -l, W_REGLETA + dz)} id={`${g}-rg`} oro={mdf} />
@@ -643,7 +728,7 @@ function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, 
         <g>
           {/* MDF de poro fino por encima del color de equipo. */}
           {G.caras.filter(c => c.rol !== 'fondo').map(c => (
-            <polygon key={`po${c.rol}`} points={poly(c.v)} fill="#2a1a0c" opacity=".13" filter={`url(#${g}-poro)`} />
+            <polygon key={`po${c.rol}`} points={poly(c.v)} {...poroProps(uid, 0.13)} />
           ))}
           {/* Uniones dentadas: canto quemado, central en un lado de cada arista y de esquina en el otro. */}
           {G.caras.filter(c => c.rol !== 'fondo').map(c => dibujaLeng(c.rol, c.v))}
@@ -658,7 +743,7 @@ function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, 
         return (
           <g data-led={apagado ? 'apagado' : luz ? 'encendido' : desconectado ? (buscando ? 'buscando-magenta' : 'equipo-sin-maestro') : 'equipo'}>
             <polygon points={circulo(0.062)} fill="#07090b" stroke="rgba(255,255,255,.22)" strokeWidth=".6" />
-            {encendido && <polygon points={circulo(luz ? 0.08 : 0.072)} fill={hexLed} opacity={luz ? 0.6 : 0.45} filter={`url(#${g}-led)`} />}
+            {encendido && <polygon points={circulo(luz ? 0.08 : 0.072)} fill={hexLed} opacity={luz ? 0.6 : 0.45} filter={`url(#${uid}-led)`} />}
             <polygon
               points={circulo(0.05)}
               fill={encendido ? hexLed : 'rgba(228,236,242,.2)'}
@@ -738,9 +823,11 @@ function DecalSinWifi({ E, X, elev, id }: { E: Escena; X: number; elev: number; 
 
 /* ---------- Haz de luz del LED y etiqueta de fase (capa por encima de todos los cubos) ---------- */
 
-function HazSenal({ uid, id, luz, X, cx, cy, led, pulso, E }: {
-  uid: string; id: number; luz: Luz; X: number; cx: number; cy: number; led: number; pulso?: Pulso; E: Escena
+const HazSenal = memo(function HazSenal({ uid, id, luzHex, luzPatron, luzEtiqueta, X, cx, cy, led, fase, t0, E }: {
+  uid: string; id: number; luzHex: string; luzPatron: Patron; luzEtiqueta?: string; X: number; cx: number; cy: number; led: number; fase?: Patron; t0?: number; E: Escena
 }) {
+  const luz: Luz = { hex: luzHex, patron: luzPatron, etiqueta: luzEtiqueta }
+  const pulso = usePulso(fase, t0, id)
   const { p } = E
   const k = pulso?.k ?? 1
   const hex = luz.hex
@@ -794,7 +881,7 @@ function HazSenal({ uid, id, luz, X, cx, cy, led, pulso, E }: {
       )}
     </g>
   )
-}
+})
 
 /** Destello de contacto al encajar: brillo dorado breve sobre los pines de la base. */
 function DestelloContacto({ uid, id, X, k, E }: { uid: string; id: number; X: number; k: number; E: Escena }) {
@@ -827,7 +914,7 @@ export function CuboMuestra({ acabado, tono, estado }: { acabado: AcabadoTablero
   const mdf = acabado === 'mdf'
   const elev = estado.flota ? ELEV_FLOTA : 0
   const luz = estado.luz
-  const pulsos = useRelojPulsos(luz && luz.patron !== 'fijo' ? [{ id: 1, fase: luz.patron }] : estado.flota ? [{ id: 1, fase: 'flota' as Patron }] : [])
+  const inicios = useIniciosSenal(luz && luz.patron !== 'fijo' ? [{ id: 1, fase: luz.patron }] : estado.flota ? [{ id: 1, fase: 'flota' as Patron }] : [])
   const [cx, pie] = E.p([0, 0, 0.5])
   const [, domo] = E.p(E.girar(0, elev, 0).pt(0, 1, 0.5))
   const arriba = domo - (luz ? 112 : 34)
@@ -835,11 +922,30 @@ export function CuboMuestra({ acabado, tono, estado }: { acabado: AcabadoTablero
   const lid = mdf ? '#cdb99b' : '#565a64'
   return (
     <svg className="leyenda-led__cubo" width="150" height={Math.round((150 * alto) / 180)} viewBox={`${cx - 90} ${arriba} 180 ${alto}`} aria-hidden="true" focusable="false">
+      <DefsCubos uid={uid} />
       <polygon points={E.pts(horiz(-0.9, 0.9, 0, -0.3, 1.25))} fill={lid} opacity=".9" />
       <Cubo uid={uid} id={1} X={0} elev={elev} led={1} desconectado={Boolean(estado.flota)} buscando={Boolean(estado.buscando)} apagado={Boolean(estado.apagado)} mdf={mdf} tono={tono}
-        equipo={estado.equipo} luz={luz ? { hex: luz.hex, patron: luz.patron } : null} pulso={pulsos[1]} E={E} />
-      {luz && <HazSenal uid={uid} id={1} luz={{ hex: luz.hex, patron: luz.patron }} X={0} cx={cx} cy={domo} led={1} pulso={pulsos[1]} E={E} />}
+        equipo={estado.equipo} luz={luz ? { hex: luz.hex, patron: luz.patron } : null} fase={inicios[1]?.fase} t0={inicios[1]?.t0} E={E} />
+      {luz && <HazSenal uid={uid} id={1} luzHex={luz.hex} luzPatron={luz.patron} X={0} cx={cx} cy={domo} led={1} fase={inicios[1]?.fase} t0={inicios[1]?.t0} E={E} />}
     </svg>
+  )
+}
+
+/** Botón para activar o apagar el sonido de encaje; la elección vale para todos los tableros. */
+function BotonSonidoEncaje() {
+  const activo = useSyncExternalStore(suscribirSonidoEncaje, sonidoEncajeActivo, sonidoEncajeActivo)
+  const Icono = activo ? Volume2 : VolumeX
+  return (
+    <button
+      type="button"
+      className={`tablero3d-sonido${activo ? '' : ' is-off'}`}
+      aria-pressed={activo}
+      aria-label={activo ? 'Apagar el sonido de encaje de los cubos' : 'Activar el sonido de encaje de los cubos'}
+      title={activo ? 'Sonido de encaje: activado' : 'Sonido de encaje: apagado'}
+      onClick={() => { const nuevo = !activo; fijarSonidoEncaje(nuevo); if (nuevo) playEncaje() }}
+    >
+      <Icono size={15} aria-hidden="true" />
+    </button>
   )
 }
 
@@ -940,7 +1046,7 @@ export default function Tablero3D({
     }
   })
 
-  const pulsos = useRelojPulsos(cubos.filter(c => (c.luz && c.luz.patron !== 'fijo') || (!c.luz && c.desconectado)).map(c => ({ id: c.id, fase: c.luz ? c.luz.patron : ('flota' as Patron) })))
+  const inicios = useIniciosSenal(cubos.filter(c => (c.luz && c.luz.patron !== 'fijo') || (!c.luz && c.desconectado)).map(c => ({ id: c.id, fase: c.luz ? c.luz.patron : ('flota' as Patron) })))
 
   // Destello de contacto: al pasar de desconectado a conectado, cuando el cubo termina de bajar.
   const antes = useRef(new Map<number, boolean>())
@@ -957,6 +1063,32 @@ export default function Tablero3D({
     if (Object.keys(nuevos).length) setDestellos(d => ({ ...d, ...nuevos }))
   })
   const hayDestello = Object.keys(destellos).length > 0
+
+  // Sonido de encaje (sonidoEncaje.ts): suena cuando el cubo termina de asentarse, al llegar a otra
+  // casilla, al bajarlo después de levantarlo o al reconectarse. Un cambio masivo (nivel nuevo,
+  // reinicio) no suena, y varios cubos a la vez suenan como uno solo.
+  const encajes = useRef(new Map<number, { pos: number; lev: boolean; desc: boolean }>())
+  const temporizadores = useRef<number[]>([])
+  // Corre en cada render a propósito: compara cada cubo con el render anterior.
+  useEffect(() => {
+    const previo = encajes.current
+    const primera = previo.size === 0
+    let movidos = 0
+    let espera = -1
+    const siguiente = new Map<number, { pos: number; lev: boolean; desc: boolean }>()
+    for (const c of cubos) {
+      const ahora = { pos: c.posicion, lev: Boolean(c.levantado), desc: c.desconectado }
+      siguiente.set(c.id, ahora)
+      const antes = previo.get(c.id)
+      if (!antes || ahora.lev || ahora.desc) continue
+      if (antes.pos !== ahora.pos) { movidos++; espera = Math.max(espera, 330) }
+      else if (antes.lev || antes.desc) espera = Math.max(espera, ENCAJE_MS - 60)
+    }
+    encajes.current = siguiente
+    if (primera || espera < 0 || movidos > 3) return
+    temporizadores.current.push(window.setTimeout(playEncaje, espera))
+  })
+  useEffect(() => () => { for (const id of temporizadores.current) window.clearTimeout(id) }, [])
   useEffect(() => {
     if (!hayDestello) return
     let raf = 0
@@ -983,6 +1115,7 @@ export default function Tablero3D({
 
   return (
     <>
+      <div className="tablero3d-marco">
       <div
         ref={viewportRef}
         className="tablero3d-viewport"
@@ -1000,6 +1133,7 @@ export default function Tablero3D({
             aria-hidden="true"
             focusable="false"
           >
+            <DefsCubos uid={uid} />
             <BandejaMemo mdf={mdf} uid={uid} E={E} caras={BANDEJAS[acabado]} />
             {casillas.map(c => {
               const X = xCasilla(c.posicion + 1)
@@ -1019,7 +1153,7 @@ export default function Tablero3D({
               )
             })}
             {cubos.map(c => (
-              <Cubo
+              <CuboMemo
                 key={c.id}
                 uid={uid}
                 id={c.id}
@@ -1032,8 +1166,10 @@ export default function Tablero3D({
                 mdf={mdf}
                 tono={tono}
                 equipo={equipoCubo(c.id)}
-                luz={c.luz}
-                pulso={pulsos[c.id]}
+                luzHex={c.luz?.hex}
+                luzPatron={c.luz?.patron}
+                fase={inicios[c.id]?.fase}
+                t0={inicios[c.id]?.t0}
                 E={E}
               />
             ))}
@@ -1044,12 +1180,15 @@ export default function Tablero3D({
                   key={`haz-${c.id}`}
                   uid={uid}
                   id={c.id}
-                  luz={c.luz!}
+                  luzHex={c.luz!.hex}
+                  luzPatron={c.luz!.patron}
+                  luzEtiqueta={c.luz!.etiqueta}
                   X={c.X}
                   cx={hx}
                   cy={hy}
                   led={c.led}
-                  pulso={pulsos[c.id]}
+                  fase={inicios[c.id]?.fase}
+                  t0={inicios[c.id]?.t0}
                   E={E}
                 />
               )
@@ -1126,6 +1265,8 @@ export default function Tablero3D({
             )
           })}
         </div>
+      </div>
+      <BotonSonidoEncaje />
       </div>
       <div className="tablero3d-sr-only" data-testid="control-board-3d-summary">
         Vista 3D del tablero. {resumen.join(' ')}

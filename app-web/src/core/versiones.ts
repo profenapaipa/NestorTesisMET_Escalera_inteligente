@@ -30,6 +30,17 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.1', fecha: '2026-11-24', publica: true,
+    titulo: 'Juego fluido en cualquier equipo y sonido de encaje',
+    cambios: 'El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón.',
+    detalle: [
+      m('Grafo en modo seguimiento: mientras se juega, la posición actual queda siempre centrada y con zoom; en cada jugada solo se dibuja la trayectoria del intento, no el grafo completo. Al terminar o al tocar el grafo vuelve la vista interactiva en el mismo encuadre.'),
+      c('Mover un cubo en Simulación libre con 5 pares cortaba la animación hasta medio segundo mientras el grafo se redibujaba; ahora el cuadro más lento es de unos 20 ms en un equipo normal.'),
+      m('Tablero 3D más liviano: cada cubo se redibuja solo cuando cambia lo suyo, la vibración de las señales usa un único reloj y los efectos de luz, sombra y textura del MDF se crean una sola vez para todos los cubos.'),
+      n('Sonido de encaje: un «toc» suave de madera con un clic imantado cuando un cubo se asienta en su casilla. Se apaga o enciende con el botón del altavoz en la esquina del tablero, y la elección se recuerda.'),
+    ],
+  },
+  {
     version: '0.14.0', fecha: '2026-11-23', publica: true,
     titulo: 'Tablero 3D realista y órdenes con confirmación',
     cambios: 'Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían.',

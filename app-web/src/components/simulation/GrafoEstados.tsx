@@ -192,9 +192,10 @@ type Props = {
 // mismo turno que la jugada y Cytoscape bloqueaba el hilo principal (medido:
 // cuadros de ~353 ms, 6,5 s con la CPU ×4), cortando la animación del tablero.
 // Se aplaza la actualización hasta que termina la animación de la jugada
-// (~240 ms) y el navegador queda libre; jugadas seguidas se agrupan en una sola
-// actualización. El tablero responde al instante; el grafo, un momento después.
-const ESPERA_GRAFO_MS = 280
+// (vuelo en arco de 420 ms en Tablero3D) y el navegador queda libre; jugadas
+// seguidas se agrupan en una sola actualización. Con 280 ms el redibujo caía
+// todavía al final del vuelo (medido: cuadro de 457 ms a los 460 ms).
+const ESPERA_GRAFO_MS = 520
 function useDiferido<T>(valor: T, ms: number): T {
   const [diferido, setDiferido] = useState(valor)
   useEffect(() => {
@@ -214,9 +215,26 @@ function useDiferido<T>(valor: T, ms: number): T {
   return diferido
 }
 
+// Modo seguimiento (2026-11-24, pedido de Nestor): mientras se juega, el grafo completo se pinta UNA vez
+// como imagen (fondo) y en cada jugada solo se dibuja la trayectoria del intento en una capa liviana
+// encima; el centrado y el zoom son una transformación que hace la tarjeta gráfica. Así una jugada
+// no vuelve a dibujar los 6552 elementos del grafo de 5 pares, en ningún dispositivo.
+type Seguimiento = {
+  url: string
+  bb: { x1: number; y1: number; w: number; h: number }
+  z: number // zoom fijo del seguimiento (px de pantalla por unidad del modelo)
+  kk: number // tamaño de las marcas del fondo (unidad × k del momento de la foto)
+  clave: string
+}
+const ACERCAMIENTO = (nodos: number) => (nodos > 500 ? 3 : nodos > 100 ? 2.2 : 1.5)
+const LADO_MAX_IMAGEN = 4096 // límite seguro de lienzo en celulares
+
 function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height, terminado = false, seguimiento = true, modo = 'juego', onCy, figura }: Props) {
-  const previos = useDiferido(previosVivos, ESPERA_GRAFO_MS)
-  const actual = useDiferido(actualVivo, ESPERA_GRAFO_MS)
+  const [seg, setSeg] = useState<Seguimiento | null>(null)
+  // Con la capa de seguimiento la jugada cuesta poco: el grafo responde casi al instante.
+  const espera = seg ? 90 : ESPERA_GRAFO_MS
+  const previos = useDiferido(previosVivos, espera)
+  const actual = useDiferido(actualVivo, espera)
   const graph = useMemo(() => buildStateGraph(pares), [pares])
   const boxRef = useRef<HTMLDivElement>(null)
   // Zoom con el que se ve todo el grafo (base de la escala) y si la persona ya
@@ -224,6 +242,22 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   const z0Ref = useRef(1)
   const touchedRef = useRef(false)
   const cyRef = useRef<Core | null>(null)
+  // Hasta cuándo el zoom en curso lo hace la propia app (seguimiento o vista
+  // completa) y no la persona: ese zoom no reconstruye la hoja de estilos.
+  const zoomAutoHastaRef = useRef(0)
+  // Ajusta solo las etiquetas visibles (Inicio, Fin, «Tú») al zoom actual.
+  const etiquetarRef = useRef<() => void>(() => {})
+  const cyActualRef = useRef(-1)
+  // Datos del dibujo que la capa de seguimiento necesita sin tocar Cytoscape.
+  const posRef = useRef<number[][]>([])
+  const unitRef = useRef(1)
+  const kRef = useRef(1)
+  const paletaRef = useRef<Palette | null>(null)
+  // La persona tomó el control de la vista (rueda, arrastre o «Ver todo»): se sale del seguimiento.
+  const [manual, setManual] = useState(false)
+  const [segFallo, setSegFallo] = useState(false)
+  const generandoRef = useRef(false)
+  const [tam, setTam] = useState({ w: 0, h: 0 })
   // El aviso al exterior pasa por una referencia para que cambiar la función
   // no obligue a reconstruir el grafo entero.
   const onCyRef = useRef(onCy)
@@ -264,7 +298,10 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   useEffect(() => {
     const el = boxRef.current
     if (!el) return
-    const medir = () => { if (el.clientWidth > 0 && el.clientHeight > 0) setVisible(true) }
+    const medir = () => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) setVisible(true)
+      setTam(prev => (prev.w === el.clientWidth && prev.h === el.clientHeight ? prev : { w: el.clientWidth, h: el.clientHeight }))
+    }
     medir()
     const ro = new ResizeObserver(medir)
     ro.observe(el)
@@ -290,6 +327,10 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
         paper: cssVar(caja, '--color-paper', '#E7EDEE'), bg: cssVar(caja, '--color-bg', '#0B0F10'),
       }
       const tema = esFondoClaro(palette.bg) ? TEMA_CLARO : TEMA_OSCURO
+      posRef.current = pos
+      unitRef.current = unit
+      kRef.current = 1
+      paletaRef.current = palette
       setTema(tema)
       cy = cytoscape({
         container: caja,
@@ -342,18 +383,61 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
       // (12 px) y nodos/aristas crecen solo con la raíz del zoom, en vez de
       // inflarse linealmente al acercar.
       z0Ref.current = cy.zoom()
-      let lastK = 1, lastFs = 0, raf = 0
+      let lastK = 1, lastFs = 0, espera = 0, idle = 0
       const reescalar = () => {
-        raf = 0
+        espera = 0; idle = 0
         if (!cy) return
         const z = cy.zoom()
         const k = Math.min(1.5, Math.max(0.1, Math.sqrt(z0Ref.current / z)))
         const fs = 12 / z
         if (Math.abs(k - lastK) / lastK < 0.04 && Math.abs(fs - lastFs) / Math.max(lastFs, 1e-6) < 0.04) return
-        lastK = k; lastFs = fs
+        lastK = k; lastFs = fs; kRef.current = k
         cy.style(buildStyle(palette, tema, k * unit, fs))
       }
-      cy.on('zoom', () => { if (!raf) raf = requestAnimationFrame(reescalar) })
+      // Reescalar reemplaza la hoja de estilos y recalcula todos los elementos
+      // (hasta ~400 ms en el grafo de 5 pares). Antes se hacía en cada cuadro
+      // de la animación del zoom (varias pasadas por escalón) y cortaba las
+      // animaciones del tablero. Ahora se hace una sola vez, cuando la vista
+      // lleva un momento quieta y el navegador está libre.
+      const ventana = window as Window & {
+        requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number
+        cancelIdleCallback?: (id: number) => void
+      }
+      const programar = () => {
+        window.clearTimeout(espera)
+        if (idle) ventana.cancelIdleCallback?.(idle)
+        idle = 0
+        espera = window.setTimeout(() => {
+          if (ventana.requestIdleCallback) idle = ventana.requestIdleCallback(reescalar, { timeout: 500 })
+          else reescalar()
+        }, 220)
+      }
+      // Las únicas etiquetas visibles son tres (Inicio, Fin y «Tú»): mantener
+      // su tamaño en pantalla es barato si se ajustan solo ellas. En el zoom
+      // automático (escalones del seguimiento) no se reconstruye la hoja: los
+      // nodos crecen con la vista y se evita una pasada de ~400 ms por escalón
+      // que cortaba las animaciones del tablero. El zoom manual sí reescala.
+      let rafEtq = 0
+      etiquetarRef.current = () => {
+        rafEtq = 0
+        if (!cy) return
+        const fsE = 12 / cy.zoom()
+        const ids = [graph.inicioId, graph.finId, ...(cyActualRef.current > 0 ? [cyActualRef.current] : [])]
+        cy.batch(() => {
+          for (const id of ids) {
+            const n = cy!.getElementById(`n${id}`)
+            if (!n.empty()) n.style({ 'font-size': fsE, 'text-background-padding': `${Math.max(1, fsE * 0.15)}px` })
+          }
+        })
+      }
+      cy.on('zoom', () => {
+        if (!rafEtq) rafEtq = requestAnimationFrame(() => etiquetarRef.current())
+        if (performance.now() > zoomAutoHastaRef.current) programar()
+      })
+      cy.one('destroy', () => {
+        window.clearTimeout(espera); if (idle) ventana.cancelIdleCallback?.(idle)
+        if (rafEtq) cancelAnimationFrame(rafEtq)
+      })
       reescalar()
       aplicadoRef.current = null // grafo nuevo: la primera pasada es completa
       setReady(true)
@@ -378,6 +462,7 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   // 0,7 s sin animar—, así que ahí la vista salta de una.
   const grande = graph.nodes.length > 500
   const verTodoAnimado = (cy: Core) => {
+    zoomAutoHastaRef.current = performance.now() + 450
     if (grande) cy.fit(undefined, MARGEN)
     else cy.animate({ fit: { eles: cy.elements(), padding: MARGEN } }, { duration: 320 })
   }
@@ -388,6 +473,7 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
     if (pasos === pasosRef.current) return
     const retrocede = pasos < pasosRef.current
     pasosRef.current = pasos
+    if (seg || generandoRef.current) return
     if (touchedRef.current) return
     if (pasos <= 1 || retrocede) { verTodoAnimado(cy); return }
     // Acercamiento por escalones: la vista se cierra en cinco pasos a lo
@@ -414,6 +500,7 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
     const q = nodo.position()
     const z = cambiaZoom ? objetivo : cy.zoom()
     const pan = { x: cy.width() / 2 - q.x * z, y: cy.height() / 2 - q.y * z }
+    zoomAutoHastaRef.current = performance.now() + 450
     if (grande) {
       // Un solo cambio de vista para un solo redibujo; y si el zoom no
       // cambia, solo se desplaza (así no se recalcula la hoja de estilos).
@@ -423,7 +510,7 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
     }
     cy.animate(cambiaZoom ? { center: { eles: nodo }, zoom: z } : { center: { eles: nodo } }, { duration: 320 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actual, ready, seguimiento])
+  }, [actual, ready, seguimiento, seg])
 
   // Al terminar el intento, vista completa para leer el recorrido entero.
   useEffect(() => {
@@ -459,6 +546,8 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   useEffect(() => {
     const cy = cyRef.current
     if (!cy || !ready) return
+    // Con la capa de seguimiento activa no se toca Cytoscape: lo pendiente se aplica de una vez al salir.
+    if (seg || generandoRef.current) return
     const maxE = Math.max(2, ...counts.aristas)
     const maxN = Math.max(2, ...counts.nodos)
     const enRuta = new Set(actual)
@@ -522,11 +611,96 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
       for (const i of aristas) aplicarArista(i)
     })
 
+    cyActualRef.current = cur
+    etiquetarRef.current()
     aplicadoRef.current = {
       maxN, maxE,
       nodos: counts.nodos, aristas: counts.aristas, ruta: enRuta, aristasRuta, cur,
     }
-  }, [counts, actual, graph, ready, modo])
+  }, [counts, actual, graph, ready, modo, seg, segFallo])
+
+  // ---------- Modo seguimiento: entrar, mantener y salir ----------
+  const quiereSeguir = modo === 'juego' && seguimiento && !terminado && !manual && !segFallo && ready
+  const claveSeg = `${pares}|${tema === TEMA_CLARO ? 'c' : 'o'}|${verMinimas ? 'm' : ''}|${previos.length}|${tam.w}x${tam.h}`
+  // Un intento nuevo devuelve el seguimiento aunque antes se haya movido la vista a mano.
+  const largoRef = useRef(0)
+  useEffect(() => {
+    if (actual.length < largoRef.current || actual.length <= 1) setManual(false)
+    largoRef.current = actual.length
+  }, [actual])
+
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!quiereSeguir || !cy || tam.w === 0) {
+      if (seg) setSeg(null)
+      return
+    }
+    if ((seg && seg.clave === claveSeg) || generandoRef.current) return
+    generandoRef.current = true
+    let cancelado = false
+    // Foto del grafo sin la trayectoria del intento (la dibuja la capa) ni rótulos (la capa los
+    // dibuja a tamaño fijo en pantalla). Se toma con el zoom del seguimiento para que se vea nítida.
+    const ids = new Set([graph.inicioId, graph.finId, ...actual])
+    cy.batch(() => {
+      for (const id of ids) {
+        const n = cy.getElementById(`n${id}`)
+        if (!n.empty()) { n.removeClass('ruta actual'); n.data('label', '') }
+      }
+      cy.edges('.ruta').removeClass('ruta')
+    })
+    aplicadoRef.current = null // al salir se repasa todo de una vez
+    const caja = cy.elements().boundingBox()
+    const bb = { x1: caja.x1, y1: caja.y1, w: Math.max(1, caja.w), h: Math.max(1, caja.h) }
+    const z = Math.min(z0Ref.current * ACERCAMIENTO(graph.nodes.length), cy.maxZoom())
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    const escala = Math.min(z * dpr, LADO_MAX_IMAGEN / bb.w, LADO_MAX_IMAGEN / bb.h)
+    const kk = unitRef.current * kRef.current
+    let url = ''
+    const fallar = () => { generandoRef.current = false; if (!cancelado) setSegFallo(true) }
+    try {
+      const promesa = cy.png({ output: 'blob-promise', full: true, scale: escala }) as unknown as Promise<Blob>
+      promesa.then(blob => {
+        generandoRef.current = false
+        if (cancelado) return
+        url = URL.createObjectURL(blob)
+        setSeg({ url, bb, z, kk, clave: claveSeg })
+      }, fallar)
+    } catch { fallar() }
+    return () => { cancelado = true; generandoRef.current = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quiereSeguir, claveSeg, ready])
+
+  // La URL de la foto se libera al cambiar o al desmontar, con unos segundos de margen: liberarla
+  // mientras la imagen aún carga provocaba un error de carga (ERR_FILE_NOT_FOUND) al cambiar de pestaña.
+  const urlRef = useRef('')
+  useEffect(() => {
+    const anterior = urlRef.current
+    urlRef.current = seg?.url ?? ''
+    if (anterior && anterior !== urlRef.current) window.setTimeout(() => URL.revokeObjectURL(anterior), 4000)
+  }, [seg])
+  useEffect(() => () => {
+    const ultima = urlRef.current
+    if (ultima) window.setTimeout(() => URL.revokeObjectURL(ultima), 4000)
+  }, [])
+
+  // Salir del seguimiento conservando el encuadre: Cytoscape queda donde estaba la capa.
+  function tomarControl() {
+    const cy = cyRef.current
+    if (seg && cy) {
+      const cuadro = encuadre(seg)
+      zoomAutoHastaRef.current = performance.now() + 450
+      cy.viewport({ zoom: seg.z, pan: { x: cuadro.tx - seg.bb.x1 * seg.z, y: cuadro.ty - seg.bb.y1 * seg.z } })
+    }
+    touchedRef.current = true
+    setManual(true)
+  }
+
+  // Desplazamiento que centra la posición actual con el zoom del seguimiento.
+  function encuadre(s: Seguimiento) {
+    const id = actual.length ? actual[actual.length - 1] : graph.inicioId
+    const q = posRef.current[id - 1] ?? [s.bb.x1 + s.bb.w / 2, s.bb.y1 + s.bb.h / 2]
+    return { tx: tam.w / 2 - (q[0] - s.bb.x1) * s.z, ty: tam.h / 2 - (q[1] - s.bb.y1) * s.z }
+  }
 
   const cur = actual.length ? actual[actual.length - 1] : graph.inicioId
   const nodoActual = graph.nodes[cur - 1]
@@ -561,6 +735,7 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   function verTodo() {
     const cy = cyRef.current
     if (!cy) return
+    if (seg) setManual(true)
     touchedRef.current = false
     cy.fit(undefined, MARGEN)
     z0Ref.current = cy.zoom()
@@ -569,6 +744,9 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
   function irAMiPosicion() {
     const cy = cyRef.current
     if (!cy) return
+    // En seguimiento la posición ya está centrada; si se había salido, se vuelve a seguir.
+    if (seg) return
+    if (manual && modo === 'juego' && seguimiento && !terminado) { touchedRef.current = false; setManual(false); return }
     const nodo = cy.getElementById(`n${cur}`)
     const zoom = Math.min(4, cy.maxZoom())
     if (grande) {
@@ -636,7 +814,10 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
         position: 'relative', border: '1px solid var(--color-line)', borderRadius: 'var(--radius)', background: 'var(--color-bg)',
         ...(height === undefined ? { flex: '1 1 0', minHeight: '240px' } : { height: `${height}px` }),
       }}>
-        <div ref={boxRef} role="img" aria-label={`Grafo de estados de ${graph.nodes.length} posiciones`} style={{ position: 'absolute', inset: 0 }} />
+        <div ref={boxRef} role="img" aria-label={`Grafo de estados de ${graph.nodes.length} posiciones`} style={{ position: 'absolute', inset: 0, visibility: seg ? 'hidden' : 'visible' }} />
+        {seg && <CapaSeguimiento seg={seg} cuadro={encuadre(seg)} actual={actual} graph={graph} pos={posRef.current}
+          ruta={tema.ruta ?? paletaRef.current?.caution ?? '#f1c21b'} relleno={tema.inicio ? (tema.ruta ?? '#f1c21b') : tema.actualRelleno}
+          texto={paletaRef.current?.paper ?? '#e7edee'} fondo={paletaRef.current?.bg ?? '#0b0f10'} onTomarControl={tomarControl} />}
         {!ready && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', ...sectionLabel }}>Dibujando grafo…</div>}
         {hoverNode && (
           <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'var(--color-panel)', border: '1px solid var(--color-line-strong)', borderRadius: 'var(--radius)', padding: '8px 10px', pointerEvents: 'none' }}>
@@ -660,6 +841,51 @@ function GrafoEstados({ pares, previos: previosVivos, actual: actualVivo, height
         <span style={{ fontSize: '11px', color: 'var(--color-paper-faint)', marginLeft: 'auto' }}>
           {intentos} intento{intentos === 1 ? '' : 's'} · rueda para zoom, arrastra para mover
         </span>
+      </div>
+    </div>
+  )
+}
+
+/** Capa del modo seguimiento: la foto del grafo y, encima, solo la trayectoria del intento.
+ *  Cambiar de jugada mueve la transformación (la tarjeta gráfica) y redibuja unas pocas marcas. */
+function CapaSeguimiento({ seg, cuadro, actual, graph, pos, ruta, relleno, texto, fondo, onTomarControl }: {
+  seg: Seguimiento; cuadro: { tx: number; ty: number }; actual: number[]; graph: StateGraph; pos: number[][]
+  ruta: string; relleno: string; texto: string; fondo: string; onTomarControl: () => void
+}) {
+  const { bb, z, kk } = seg
+  const P = (id: number) => pos[id - 1] ?? [0, 0]
+  const cur = actual.length ? actual[actual.length - 1] : graph.inicioId
+  // Inicio y Fin conservan su color propio (como en el grafo interactivo, donde su estilo va después del de la ruta).
+  const visitados = [...new Set(actual)].filter(id => id !== graph.inicioId && id !== graph.finId)
+  const fs = 12 / z // 12 px en pantalla
+  const rotulo = (id: number, texto: string, radio: number) => {
+    const [x, y] = P(id)
+    return (
+      <text key={`r${id}`} x={x} y={y - radio - 5 * kk} textAnchor="middle" fontSize={fs} fontWeight={700}
+        fill={textoColor} stroke={fondo} strokeWidth={3 / z} paintOrder="stroke" style={{ fontFamily: 'var(--font-sans, sans-serif)' }}>{texto}</text>
+    )
+  }
+  const textoColor = texto
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', cursor: 'grab', touchAction: 'none' }}
+      onWheel={onTomarControl} onPointerDown={onTomarControl} data-grafo-seguimiento="activo">
+      <div style={{
+        position: 'absolute', left: 0, top: 0, width: bb.w, height: bb.h, transformOrigin: '0 0',
+        transform: `translate3d(${cuadro.tx.toFixed(1)}px, ${cuadro.ty.toFixed(1)}px, 0) scale(${z})`,
+        transition: 'transform 340ms cubic-bezier(.2,.7,.2,1)', willChange: 'transform',
+      }}>
+        <img src={seg.url} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+        <svg viewBox={`${bb.x1} ${bb.y1} ${bb.w} ${bb.h}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
+          {actual.length > 1 && (
+            <polyline points={actual.map(id => P(id).join(',')).join(' ')} fill="none" stroke={ruta} strokeWidth={4.5 * kk}
+              strokeLinejoin="round" strokeLinecap="round" />
+          )}
+          {visitados.filter(id => id !== cur).map(id => <circle key={id} cx={P(id)[0]} cy={P(id)[1]} r={4 * kk} fill={ruta} />)}
+          <circle cx={P(cur)[0]} cy={P(cur)[1]} r={8 * kk} fill={relleno} stroke={ruta} strokeWidth={3.5 * kk} />
+          {cur !== graph.inicioId && rotulo(graph.inicioId, 'Inicio', 6 * kk)}
+          {cur !== graph.finId && rotulo(graph.finId, 'Fin', 6 * kk)}
+          {rotulo(cur, cur === graph.inicioId ? 'Inicio · Tú' : cur === graph.finId ? 'Fin · Tú' : 'Tú', 8 * kk + 1.75 * kk)}
+        </svg>
       </div>
     </div>
   )

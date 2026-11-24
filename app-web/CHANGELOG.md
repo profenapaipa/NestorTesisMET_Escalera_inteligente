@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
 | **0.14.0** | 2026-11-23 | Tablero 3D realista y órdenes con confirmación | Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían. |
 | **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
 | **0.12.3** | 2026-11-21 | El juego al centro de la atención | Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado. |
@@ -38,6 +39,13 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.1 · 2026-11-24 · juego fluido en cualquier equipo y sonido de encaje
+
+- **Grafo en modo seguimiento:** mientras se juega, el grafo completo se pinta una sola vez como imagen y en cada jugada solo se dibuja la trayectoria del intento; el centrado y el zoom los hace la tarjeta gráfica. La posición actual queda siempre centrada. Al terminar el intento o al tocar el grafo vuelve la vista interactiva en el mismo encuadre.
+- **Corrección: cortes al mover un cubo.** Con 5 pares, redibujar el grafo bloqueaba la animación hasta ~460 ms; ahora el cuadro más lento es de ~20 ms en un equipo normal y de ~100-200 ms con la CPU frenada 4 veces.
+- **Tablero 3D más liviano:** cada cubo se redibuja solo cuando cambia lo suyo; la vibración de las señales usa un único reloj; los filtros de sombra, halo y LED y la textura del MDF se crean una sola vez para todo el tablero.
+- **Sonido de encaje:** «toc» corto de madera y clic metálico tenue, sintetizado (sin archivos), cuando un cubo llega a su casilla, se baja o se reconecta. Botón del altavoz en la esquina del tablero para apagarlo; la elección se recuerda en el navegador.
 
 ## 0.14.0 · 2026-11-23 · tablero 3D realista y órdenes con confirmación
 
