@@ -37,7 +37,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
       m('Grafo en modo seguimiento: mientras se juega, la posición actual queda siempre centrada y con zoom; en cada jugada solo se dibuja la trayectoria del intento, no el grafo completo. Al terminar o al tocar el grafo vuelve la vista interactiva en el mismo encuadre.'),
       c('Mover un cubo en Simulación libre con 5 pares cortaba la animación hasta medio segundo mientras el grafo se redibujaba; ahora el cuadro más lento es de unos 20 ms en un equipo normal.'),
       m('Tablero 3D más liviano: cada cubo se redibuja solo cuando cambia lo suyo, la vibración de las señales usa un único reloj y los efectos de luz, sombra y textura del MDF se crean una sola vez para todos los cubos.'),
-      n('Sonido de encaje: un «toc» suave de madera con un clic imantado cuando un cubo se asienta en su casilla. Se apaga o enciende con el botón del altavoz en la esquina del tablero, y la elección se recuerda.'),
+      n('Sonido de encaje: un «pop» sutil de madera con el clic del conector imantado cuando un cubo se asienta en su casilla, sintetizado como percusión física (modos resonantes del MDF). Se apaga o enciende con el botón del altavoz en la esquina del tablero, y la elección se recuerda.'),
     ],
   },
   {

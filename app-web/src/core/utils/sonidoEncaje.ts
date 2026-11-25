@@ -1,6 +1,5 @@
 // Sonido de encaje (2026-11-24, pedido del autor): cuando un cubo se asienta en su casilla suena un
-// «toc» corto de madera contra madera seguido de un clic metálico muy tenue, como el del conector
-// imantado del prototipo. Es limpio y suave para no distraer, y quien opera lo puede apagar con un
+// «pop» sutil de madera con el clic del conector imantado del prototipo. Es limpio y suave para no distraer, y quien opera lo puede apagar con un
 // botón (la elección se recuerda en este navegador).
 //
 // Se sintetiza con Web Audio (sin archivos) y usa el AudioContext compartido de ppaTones.ts.
@@ -36,83 +35,59 @@ function bufferRuido(ctx: AudioContext): AudioBuffer {
   return buf
 }
 
+// Piezas de síntesis «modal» (como la percusión física): modos resonantes del material excitados por
+// un golpe muy corto, en vez de tonos puros. Cada pieza dura décimas de segundo y se libera sola.
+function modo(c: AudioContext, out: AudioNode, t: number, f: number, g: number, caida: number) {
+  const o = c.createOscillator(), a = c.createGain()
+  o.frequency.value = f
+  a.gain.setValueAtTime(0.0001, t)
+  a.gain.exponentialRampToValueAtTime(g, t + 0.0015)
+  a.gain.exponentialRampToValueAtTime(0.0001, t + caida)
+  o.connect(a).connect(out); o.start(t); o.stop(t + caida + 0.02)
+}
+function golpe(c: AudioContext, out: AudioNode, t: number, tipo: BiquadFilterType, f: number, q: number, g: number, dur: number) {
+  const s = c.createBufferSource(), fil = c.createBiquadFilter(), a = c.createGain()
+  s.buffer = bufferRuido(c); fil.type = tipo; fil.frequency.value = f; fil.Q.value = q
+  a.gain.setValueAtTime(0.0001, t)
+  a.gain.exponentialRampToValueAtTime(g, t + 0.0008)
+  a.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  s.connect(fil).connect(a).connect(out); s.start(t); s.stop(t + dur + 0.01)
+}
+function pop(c: AudioContext, out: AudioNode, t: number, f0: number, f1: number, g: number, dur: number) {
+  const o = c.createOscillator(), a = c.createGain()
+  o.frequency.setValueAtTime(f0, t)
+  o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5)
+  a.gain.setValueAtTime(0.0001, t)
+  a.gain.exponentialRampToValueAtTime(g, t + 0.003)
+  a.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  o.connect(a).connect(out); o.start(t); o.stop(t + dur + 0.02)
+}
+
 let ultimo = 0
-/** Toc de madera y clic imantado. Varía apenas en tono y volumen para no sonar repetido. */
+/** Variante A del banco de escucha (2026-11-24): «pop» corto y redondo de la caja de MDF con el clic
+ *  del imán apenas por delante. Varía un poco en tono y volumen en cada golpe para no sonar mecánico. */
 export function playEncaje() {
   if (!activo) return
   const ahora = performance.now()
   if (ahora - ultimo < 90) return // varios cubos a la vez suenan como uno solo
   ultimo = ahora
   try {
-    const ctx = audioCompartido()
-    const t = ctx.currentTime + 0.005
-    const v = 0.92 + Math.random() * 0.16
-    const tono = 0.97 + Math.random() * 0.06
-
-    const salida = ctx.createGain()
-    salida.gain.value = 0.5 * v
-    // Un pasa-bajos suave quita la aspereza digital.
-    const suave = ctx.createBiquadFilter()
-    suave.type = 'lowpass'
-    suave.frequency.value = 6500
-    suave.connect(salida)
-    salida.connect(ctx.destination)
-
-    // 1. Cuerpo de madera: tono grave que cae rápido (≈ 90 ms).
-    const cuerpo = ctx.createOscillator()
-    const gCuerpo = ctx.createGain()
-    cuerpo.type = 'sine'
-    cuerpo.frequency.setValueAtTime(310 * tono, t)
-    cuerpo.frequency.exponentialRampToValueAtTime(190 * tono, t + 0.06)
-    gCuerpo.gain.setValueAtTime(0.0001, t)
-    gCuerpo.gain.exponentialRampToValueAtTime(0.32, t + 0.004)
-    gCuerpo.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
-    cuerpo.connect(gCuerpo).connect(suave)
-    cuerpo.start(t)
-    cuerpo.stop(t + 0.1)
-
-    // 2. Golpe de madera: ruido filtrado en banda media, muy corto (≈ 30 ms).
-    const golpe = ctx.createBufferSource()
-    golpe.buffer = bufferRuido(ctx)
-    const banda = ctx.createBiquadFilter()
-    banda.type = 'bandpass'
-    banda.frequency.value = 1100 * tono
-    banda.Q.value = 2.2
-    const gGolpe = ctx.createGain()
-    gGolpe.gain.setValueAtTime(0.0001, t)
-    gGolpe.gain.exponentialRampToValueAtTime(0.22, t + 0.002)
-    gGolpe.gain.exponentialRampToValueAtTime(0.0001, t + 0.03)
-    golpe.connect(banda).connect(gGolpe).connect(suave)
-    golpe.start(t)
-    golpe.stop(t + 0.04)
-
-    // 3. Clic imantado: 22 ms después, chasquido agudo cortísimo y un timbre metálico tenue.
-    const tc = t + 0.022
-    const clic = ctx.createBufferSource()
-    clic.buffer = bufferRuido(ctx)
-    const agudo = ctx.createBiquadFilter()
-    agudo.type = 'highpass'
-    agudo.frequency.value = 3200
-    const gClic = ctx.createGain()
-    gClic.gain.setValueAtTime(0.0001, tc)
-    gClic.gain.exponentialRampToValueAtTime(0.09, tc + 0.001)
-    gClic.gain.exponentialRampToValueAtTime(0.0001, tc + 0.008)
-    clic.connect(agudo).connect(gClic).connect(suave)
-    clic.start(tc)
-    clic.stop(tc + 0.012)
-
-    // Timbre metálico: dos parciales inarmónicos (como una pieza de acero pequeña), muy bajos.
-    for (const [f, g] of [[2650, 0.022], [3970, 0.012]] as const) {
-      const o = ctx.createOscillator()
-      const go = ctx.createGain()
-      o.type = 'sine'
-      o.frequency.value = f * tono
-      go.gain.setValueAtTime(0.0001, tc)
-      go.gain.exponentialRampToValueAtTime(g, tc + 0.002)
-      go.gain.exponentialRampToValueAtTime(0.0001, tc + 0.07)
-      o.connect(go).connect(suave)
-      o.start(tc)
-      o.stop(tc + 0.08)
-    }
+    const c = audioCompartido()
+    const t = c.currentTime + 0.01
+    const k = 0.97 + Math.random() * 0.06
+    const v = c.createGain(), lp = c.createBiquadFilter()
+    v.gain.value = 0.85 + Math.random() * 0.15
+    lp.type = 'lowpass'; lp.frequency.value = 7000
+    lp.connect(v).connect(c.destination)
+    // Imán: tic seco y un brillo metálico breve.
+    golpe(c, lp, t, 'highpass', 3800, 0.7, 0.05, 0.006)
+    modo(c, lp, t + 0.001, 4300 * k, 0.012, 0.03)
+    // Madera, 9 ms después: cuerpo hueco del cubo (pop), contacto y modos del panel de MDF.
+    const tm = t + 0.009
+    pop(c, lp, tm, 210 * k, 125 * k, 0.32, 0.075)
+    golpe(c, lp, tm, 'bandpass', 1500 * k, 1.4, 0.16, 0.022)
+    modo(c, lp, tm, 640 * k, 0.07, 0.06)
+    modo(c, lp, tm, 1730 * k, 0.03, 0.035)
+    modo(c, lp, tm, 3370 * k, 0.012, 0.018)
   } catch { /* audio no disponible */ }
 }

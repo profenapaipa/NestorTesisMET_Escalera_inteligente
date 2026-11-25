@@ -45,7 +45,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 - **Grafo en modo seguimiento:** mientras se juega, el grafo completo se pinta una sola vez como imagen y en cada jugada solo se dibuja la trayectoria del intento; el centrado y el zoom los hace la tarjeta gráfica. La posición actual queda siempre centrada. Al terminar el intento o al tocar el grafo vuelve la vista interactiva en el mismo encuadre.
 - **Corrección: cortes al mover un cubo.** Con 5 pares, redibujar el grafo bloqueaba la animación hasta ~460 ms; ahora el cuadro más lento es de ~20 ms en un equipo normal y de ~100-200 ms con la CPU frenada 4 veces.
 - **Tablero 3D más liviano:** cada cubo se redibuja solo cuando cambia lo suyo; la vibración de las señales usa un único reloj; los filtros de sombra, halo y LED y la textura del MDF se crean una sola vez para todo el tablero.
-- **Sonido de encaje:** «toc» corto de madera y clic metálico tenue, sintetizado (sin archivos), cuando un cubo llega a su casilla, se baja o se reconecta. Botón del altavoz en la esquina del tablero para apagarlo; la elección se recuerda en el navegador.
+- **Sonido de encaje:** «pop» sutil de madera con el clic del conector imantado, sintetizado como percusión física (modos resonantes del MDF, sin archivos de audio), cuando un cubo llega a su casilla, se baja o se reconecta; elegido de oído entre cinco variantes. Botón del altavoz en la esquina del tablero para apagarlo; la elección se recuerda en el navegador.
 
 ## 0.14.0 · 2026-11-23 · tablero 3D realista y órdenes con confirmación
 
