@@ -260,8 +260,13 @@ const PasoEfecto EFECTO_5_VICTORIA[]       = {
   {0, 255, 0, 0.6, 400}, {255, 215, 0, 0.6, 400}, {0, 255, 0, 0.6, 400}, {255, 215, 0, 0.6, 400},
   {255, 255, 255, 0.0, 0},
 };
-const PasoEfecto EFECTO_6_CUENTA_TICK[]    = { {0, 255, 255, 0.0, 300}, {-1, 0, 0, 0.0, 0} };
+// Cuenta regresiva como semáforo (2026-11-25, decisión del autor): 3 y 2 en ROJO («todavía no»), 1 en
+// ÁMBAR («prepárate») y ¡Inicia! en VERDE («adelante»), igual que el panel de la pantalla. Cada destello
+// parpadea (180 ms encendido, 120 ms apagado) para que se note también en los cubos del equipo rojo.
+// Sin vibración: no se confunde con el bloqueo (rojo largo con vibración) ni con el inválido (naranja).
+const PasoEfecto EFECTO_6_CUENTA_TICK[]    = { {255, 0, 0, 0.0, 180}, {0, 0, 0, 0.0, 120}, {-1, 0, 0, 0.0, 0} };
 const PasoEfecto EFECTO_7_CUENTA_INICIA[]  = { {0, 255, 0, 0.0, 300}, {-1, 0, 0, 0.0, 0} };
+const PasoEfecto EFECTO_8_CUENTA_AMBAR[]   = { {255, 191, 0, 0.0, 180}, {0, 0, 0, 0.0, 120}, {-1, 0, 0, 0.0, 0} };
 
 const PasoEfecto* efectoPasos    = nullptr;
 int   efectoNumPasos             = 0;
@@ -378,7 +383,7 @@ void aplicarPasoEfecto(int i) {
   Serial.printf("  paso %d/%d -> RGB(%d,%d,%d) vib=%.2f dur=%lums\n", i + 1, efectoNumPasos, r, g, b, p.vib, p.durMs);
 }
 
-// Arranca una de las secuencias enlatadas (EF=1..7). Cancela cualquier
+// Arranca una de las secuencias enlatadas (EF=1..8). Cancela cualquier
 // parpadeo en curso; un comando normal posterior (M=... o restaurar)
 // cancela el efecto a su vez (ver setColorSolid/actualizarColorObjetivo).
 void iniciarEfecto(int numero) {
@@ -392,8 +397,9 @@ void iniciarEfecto(int numero) {
     case 3: tabla = EFECTO_3_INVALIDO;       n = 2; break;
     case 4: tabla = EFECTO_4_BLOQUEO;        n = 5; break;
     case 5: tabla = EFECTO_5_VICTORIA;       n = 5; break;
-    case 6: tabla = EFECTO_6_CUENTA_TICK;    n = 2; break;
+    case 6: tabla = EFECTO_6_CUENTA_TICK;    n = 3; break;
     case 7: tabla = EFECTO_7_CUENTA_INICIA;  n = 2; break;
+    case 8: tabla = EFECTO_8_CUENTA_AMBAR;   n = 3; break;
     default:
       Serial.println("  numero de efecto desconocido, se ignora");
       return;

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { colorCuenta } from '../core/ppa/efectosCubo'
 
 // Estilos compartidos del sistema visual v4 ("consola neurocientífica") —
 // una sola fuente para Control Mago de Oz, Simulación y Observador. Sin
@@ -38,10 +39,11 @@ export const smallBtn: CSSProperties = {
 
 // Cuenta regresiva como un semáforo real: rojo mientras se espera (3, 2),
 // amarillo de aviso justo antes (1), verde al arrancar (0/"¡INICIA!").
+// Panel grande de la cuenta regresiva: el MISMO semáforo que muestran los cubos (efectosCubo.ts):
+// 3 y 2 rojo («todavía no»), 1 ámbar («prepárate»), ¡Inicia! verde («adelante»). El texto elige el
+// contraste más alto sobre cada color (blanco sobre rojo; casi negro sobre ámbar y verde).
 export const countdownSemaforo = (t: number): { bg: string; text: string } =>
-  t === 0 ? { bg: 'var(--color-online)', text: '#ffffff' }
-    : t === 1 ? { bg: 'var(--color-caution)', text: '#1a1300' }
-      : { bg: 'var(--color-offline)', text: '#ffffff' }
+  ({ bg: colorCuenta(t), text: t >= 2 ? '#ffffff' : '#101400' })
 
 // Colores reales del hardware de cada equipo — los mismos que el cubo
 // físico, no los acentos de interfaz (--color-blue/--color-red).

@@ -30,7 +30,7 @@ compara ambas y falla si alguien cambia una sin la otra.
 |---|---|
 | EF=4 Bloqueo | rojo con vibración decreciente (0,90 → 0,15), 4 × 500 ms → **blanco fijo** (pide volver a la posición inicial) |
 | EF=5 Victoria | verde / dorado alternando con vibración 0,6, 4 × 400 ms → **blanco fijo** |
-| EF=6 / EF=7 Cuenta regresiva | destello cian 300 ms por número / verde 300 ms al «¡Inicia!» → color de equipo |
+| EF=6 / EF=8 / EF=7 Cuenta regresiva (semáforo, 2026-11-25) | 3 y 2 **rojo** («todavía no»), 1 **ámbar** 255,191,0 («prepárate»): 180 ms encendido + 120 ms apagado (el parpadeo lo hace visible en los cubos rojos); «¡Inicia!» **verde** 300 ms («adelante») → color de equipo. Sin vibración. El panel grande de la pantalla usa los mismos colores. Requiere cargar el firmware nuevo en los 10 cubos: con el anterior, 3/2/1 se ven cian y el ámbar (EF=8) se ignora |
 | EF=3 Inválido | naranja con vibración 0,7, 1 s → color de equipo (ya coincidía) |
 
 Un efecto que ya estaba en curso al abrir una pestaña no se repite en pantalla (el cubo tampoco lo repite).

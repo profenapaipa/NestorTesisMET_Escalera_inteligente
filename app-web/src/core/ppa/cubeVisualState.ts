@@ -10,6 +10,7 @@
 // evento no relacionado pisando el estado vigente de un cubo.
 
 import { PPA_RGB, PPA_VIBRATION, PPA_VIB_PATTERN, PPA_HEX, EFECTOS, BLANCO_HEX, INVALIDO_HEX, type PPAPhase } from './ppaColors'
+import { efectoCuenta } from './efectosCubo'
 
 // Estados de la partida en Control. 'correccion' (2026-10-15): pausa
 // automática tras una jugada inválida, hasta que el tablero vuelva a la
@@ -123,6 +124,6 @@ export function resolveCubeDisplay(
   if (fueraDeLugar) return { hex: BLANCO_HEX, pulso: true }
   if (accionCubo) return { hex: PPA_HEX[accionCubo], accion: accionCubo }
   // Cuenta regresiva: destello cian por número (EF=6) y verde al «¡Inicia!» (EF=7), como el cubo.
-  if (cuentaTick !== null) return { hex: teamHex, efecto: { n: cuentaTick === 0 ? EFECTOS.CUENTA_INICIA : EFECTOS.CUENTA_TICK, clave: `cuenta-${cuentaTick}` } }
+  if (cuentaTick !== null) return { hex: teamHex, efecto: { n: efectoCuenta(cuentaTick), clave: `cuenta-${cuentaTick}` } }
   return { hex: teamHex }
 }

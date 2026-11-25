@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.4** | 2026-11-25 | Cuenta regresiva semáforo y mediación en el tablero | La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida. |
 | **0.14.3** | 2026-11-25 | Animación ágil y mediación en un solo panel | Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos. |
 | **0.14.2** | 2026-11-24 | Lo físico y lo virtual sincronizados | La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base. |
 | **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
@@ -41,6 +42,11 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.4 · 2026-11-25 · cuenta regresiva semáforo y mediación en el tablero
+
+- **Corrección: cuenta regresiva distinta en cubos y pantalla.** Ahora es un semáforo en ambos: 3 y 2 rojo, 1 ámbar (255,191,0), «¡Inicia!» verde; los destellos rojo y ámbar parpadean (180 ms encendido, 120 ms apagado) para verse también en los cubos rojos, y no vibran. Firmware `Cubo_Esclavo_v3.ino`: `EF=6` en rojo y `EF=8` nuevo (ámbar); compilado, **pendiente de cargar** en los cubos. El panel grande usa los mismos colores (`colorCuenta`) y `efectos:verificar` compara los 8 efectos con el firmware.
+- **Mediación dentro del tablero:** variante «banda» de `PanelMediacion` bajo los cubos en Control, Control simulado y Simulación libre; el aviso de jugada inválida con la animación de la regla queda debajo. Umbral de Actuar plegado.
 
 ## 0.14.3 · 2026-11-25 · animación ágil y mediación en un solo panel
 

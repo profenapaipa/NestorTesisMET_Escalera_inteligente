@@ -24,8 +24,22 @@ export const EFECTOS_CUBO: Record<number, PasoEfecto[]> = {
     { rgb: [0, 255, 0], vib: 0.6, durMs: 400 }, { rgb: [255, 215, 0], vib: 0.6, durMs: 400 },
     { rgb: [255, 255, 255], vib: 0, durMs: 0 },
   ],
-  [EFECTOS.CUENTA_TICK]: [{ rgb: [0, 255, 255], vib: 0, durMs: 300 }, { rgb: 'equipo', vib: 0, durMs: 0 }],
+  // Cuenta regresiva como semáforo (2026-11-25): 3 y 2 rojo, 1 ámbar, ¡Inicia! verde; el parpadeo (apagado
+  // 120 ms) hace visible el rojo también en los cubos del equipo rojo.
+  [EFECTOS.CUENTA_TICK]: [{ rgb: [255, 0, 0], vib: 0, durMs: 180 }, { rgb: [0, 0, 0], vib: 0, durMs: 120 }, { rgb: 'equipo', vib: 0, durMs: 0 }],
   [EFECTOS.CUENTA_INICIA]: [{ rgb: [0, 255, 0], vib: 0, durMs: 300 }, { rgb: 'equipo', vib: 0, durMs: 0 }],
+  [EFECTOS.CUENTA_AMBAR]: [{ rgb: [255, 191, 0], vib: 0, durMs: 180 }, { rgb: [0, 0, 0], vib: 0, durMs: 120 }, { rgb: 'equipo', vib: 0, durMs: 0 }],
+}
+
+/** Efecto de la cuenta regresiva para cada número (3, 2, 1, 0 = «¡Inicia!»): semáforo rojo → ámbar → verde. */
+export function efectoCuenta(tick: number): number {
+  return tick === 0 ? EFECTOS.CUENTA_INICIA : tick === 1 ? EFECTOS.CUENTA_AMBAR : EFECTOS.CUENTA_TICK
+}
+
+/** Color de la cuenta regresiva en pantalla: el mismo del primer paso del efecto que hace el cubo. */
+export function colorCuenta(tick: number): string {
+  const p = EFECTOS_CUBO[efectoCuenta(tick)][0].rgb as [number, number, number]
+  return '#' + p.map(x => x.toString(16).padStart(2, '0')).join('')
 }
 
 /** Duración de la parte animada del efecto (sin el paso final, que se mantiene). */

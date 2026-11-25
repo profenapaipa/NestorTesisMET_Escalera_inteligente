@@ -183,6 +183,21 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
           onMove={handleMove} onInvalid={handleInvalid}
           errorCell={errorCell} cubeActions={cubeActions}
           efectoSesion={status === 'victoria' ? { n: EFECTOS.VICTORIA, clave: `v${moves}` } : status === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${moves}` } : null} />
+        {/* Mediación y control de cubos dentro del tablero (los avisos van debajo). */}
+        <PanelMediacion
+          variante="banda"
+          motor={motor}
+          onEnviar={enviarFase}
+          destinoConfirmacion={selectedCubeId !== null ? `irá al cubo #${selectedCubeId}` : motor.sugerencia?.cuboSugerido ? `irá al cubo #${motor.sugerencia.cuboSugerido}` : 'selecciona antes un cubo'}
+          cubos={{
+            seleccionado: selectedCubeId,
+            accionActual: selAction,
+            avisoSinSeleccion: noSelWarning,
+            textoSinSeleccion: 'Toca un cubo del tablero para seleccionarlo',
+            onEstadoInicial: () => guarded(apagar),
+            autoOffS: AUTO_OFF_MS / 1000,
+          }}
+        />
         {(lastError || status !== 'jugando') && (
           <div style={{
             marginTop: '12px', padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--color-bg)', fontSize: '13px',
@@ -195,22 +210,6 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
         )}
       </Panel>
 
-      {/* Mediación y control de cubos (T-016): un solo panel con anillos,
-          cubo seleccionado y «Volver a estado inicial». Antes había además
-          un panel con otros tres botones PPA repetidos. */}
-      <PanelMediacion
-        motor={motor}
-        onEnviar={enviarFase}
-        destinoConfirmacion={selectedCubeId !== null ? `irá al cubo #${selectedCubeId}` : motor.sugerencia?.cuboSugerido ? `irá al cubo #${motor.sugerencia.cuboSugerido}` : 'selecciona antes un cubo'}
-        cubos={{
-          seleccionado: selectedCubeId,
-          accionActual: selAction,
-          avisoSinSeleccion: noSelWarning,
-          textoSinSeleccion: 'Toca un cubo del tablero para seleccionarlo',
-          onEstadoInicial: () => guarded(apagar),
-          autoOffS: AUTO_OFF_MS / 1000,
-        }}
-      />
 
       <Collapsible title="Histórico — bitácora del operador (simulado)" open={logOpen} onToggle={() => setLogOpen(o => !o)}>
         <LogPanel

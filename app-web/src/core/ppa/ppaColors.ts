@@ -97,8 +97,9 @@ export const EFECTOS = {
   INVALIDO:        3, // naranja + vibración 1s -> color de equipo
   BLOQUEO:         4, // rojo + vibración descendente -> blanco (fijo, pide reordenar)
   VICTORIA:        5, // verde/dorado festivo -> blanco (fijo, pide reordenar)
-  CUENTA_TICK:     6, // destello cian breve -> color de equipo (cuenta regresiva 3,2,1)
-  CUENTA_INICIA:   7, // destello verde breve -> color de equipo (¡Inicia!)
+  CUENTA_TICK:     6, // semáforo: destello ROJO con parpadeo -> color de equipo (cuenta 3 y 2)
+  CUENTA_INICIA:   7, // semáforo: destello VERDE -> color de equipo (¡Inicia!)
+  CUENTA_AMBAR:    8, // semáforo: destello ÁMBAR con parpadeo -> color de equipo (cuenta 1)
 } as const
 
 // Mismos colores que ve el cubo físico, para que el frontend pinte lo

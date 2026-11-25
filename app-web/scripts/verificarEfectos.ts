@@ -5,7 +5,7 @@
 // Busca el firmware en el repositorio privado (../../Cubo_Esclavo_v3) o en el público (../firmware/...).
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { EFECTOS_CUBO, pasoEfecto, duracionEfecto } from '../src/core/ppa/efectosCubo'
+import { EFECTOS_CUBO, pasoEfecto, duracionEfecto, efectoCuenta, colorCuenta } from '../src/core/ppa/efectosCubo'
 
 let fallos = 0
 const chk = (c: boolean, m: string) => { console.log((c ? '  OK   ' : '  FALLO') + ' · ' + m); if (!c) fallos++ }
@@ -55,8 +55,12 @@ chk(pasoEfecto(4, duracionEfecto(4) + 10).hex === '#ffffff' && pasoEfecto(4, 10)
   'Bloqueo en pantalla: empieza rojo y termina en blanco fijo, como el cubo')
 chk(pasoEfecto(5, 10).hex === '#00ff00' && pasoEfecto(5, 450).hex === '#ffd700' && pasoEfecto(5, 5000).hex === '#ffffff',
   'Victoria en pantalla: verde/dorado y luego blanco fijo, como el cubo')
-chk(pasoEfecto(6, 100).hex === '#00ffff' && pasoEfecto(6, 400).hex === null,
-  'Cuenta regresiva en pantalla: destello cian y vuelta al color de equipo')
+chk(pasoEfecto(efectoCuenta(3), 100).hex === '#ff0000' && pasoEfecto(efectoCuenta(2), 100).hex === '#ff0000'
+  && pasoEfecto(efectoCuenta(1), 100).hex === '#ffbf00' && pasoEfecto(efectoCuenta(0), 100).hex === '#00ff00'
+  && pasoEfecto(efectoCuenta(3), 220).hex === '#000000' && pasoEfecto(efectoCuenta(3), 400).hex === null,
+  'Cuenta regresiva como semáforo: 3 y 2 rojo, 1 ámbar, ¡Inicia! verde, con parpadeo y vuelta al color de equipo')
+chk(colorCuenta(3) === '#ff0000' && colorCuenta(1) === '#ffbf00' && colorCuenta(0) === '#00ff00',
+  'El panel grande de la cuenta usa los mismos colores que los cubos')
 
-console.log(fallos ? `\nEFECTOS CON ${fallos} DIFERENCIA(S) entre la pantalla y el firmware` : '\nEFECTOS OK: la pantalla reproduce los mismos efectos que el cubo físico (EF=1..7).')
+console.log(fallos ? `\nEFECTOS CON ${fallos} DIFERENCIA(S) entre la pantalla y el firmware` : '\nEFECTOS OK: la pantalla reproduce los mismos efectos que el cubo físico (EF=1..8).')
 process.exit(fallos ? 1 : 0)

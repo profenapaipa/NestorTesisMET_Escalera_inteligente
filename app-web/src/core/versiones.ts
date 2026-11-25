@@ -30,6 +30,17 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.4', fecha: '2026-11-25', publica: true,
+    titulo: 'Cuenta regresiva semáforo y mediación en el tablero',
+    cambios: 'La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida.',
+    detalle: [
+      c('Los cubos destellaban cian en el 3, 2 y 1 mientras el panel de la pantalla mostraba rojo y ámbar; ahora cubos y pantalla hacen el mismo semáforo: rojo («todavía no»), ámbar («prepárate») y verde («adelante»), con un parpadeo que se nota también en los cubos rojos.'),
+      n('Firmware del cubo: efecto nuevo EF=8 (ámbar) y EF=6 en rojo. Hay que cargarlo en los diez cubos; con el firmware anterior la cuenta se sigue viendo en cian.'),
+      m('Mediación dentro del tablero: el cubo seleccionado, los anillos Pausar/Pensar/Actuar y «Volver a estado inicial» en una franja bajo los cubos (Control, Control simulado y Simulación libre). El aviso con la animación de la regla aparece debajo y ya no la desplaza.'),
+      m('El umbral de Actuar queda plegado en una línea (se ajusta poco) para no competir con los anillos.'),
+    ],
+  },
+  {
     version: '0.14.3', fecha: '2026-11-25', publica: true,
     titulo: 'Animación ágil y mediación en un solo panel',
     cambios: 'Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos.',

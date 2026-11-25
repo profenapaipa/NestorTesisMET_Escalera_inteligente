@@ -6,6 +6,7 @@ import { classifyAttempt, explainError, successText } from '../../core/simulatio
 import { type BitacoraEvent, type PPAPhase, nowIso, toCsv, downloadFile } from '../../core/simulation/bitacora'
 import { playPpaFeedback, playError, playCountdownBeep } from '../../core/utils/ppaTones'
 import { PPA_HEX, PPA_TEXT, PPA_LABEL, AUTO_OFF_MS, ppaRgba, EFECTOS } from '../../core/ppa/ppaColors'
+import { efectoCuenta } from '../../core/ppa/efectosCubo'
 import { usePpaMotor, type EventoPpa } from '../../core/ppa/usePpaMotor'
 import PanelMediacion from '../ppa/PanelMediacion'
 import { Panel, SectionTitle, Collapsible, LogPanel, SignalGlyph } from '../../ui/brand'
@@ -322,8 +323,10 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
           onMove={handleMove} onInvalid={handleInvalid} errorCell={errorCell} cubeActions={cubeActions}
           efectoSesion={session === 'victoria' ? { n: EFECTOS.VICTORIA, clave: `v${intentoRef.current}` }
             : session === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${intentoRef.current}` }
-              : countdown !== null && (session === 'cuenta' || (session === 'jugando' && countdown === 0)) ? { n: countdown === 0 ? EFECTOS.CUENTA_INICIA : EFECTOS.CUENTA_TICK, clave: `c${intentoRef.current}-${countdown}` }
+              : countdown !== null && (session === 'cuenta' || (session === 'jugando' && countdown === 0)) ? { n: efectoCuenta(countdown), clave: `c${intentoRef.current}-${countdown}` }
                 : null} />
+        {/* Mediación dentro del tablero: la animación de la regla rota aparece debajo y ya no la empuja. */}
+        <PanelMediacion motor={motor} onEnviar={enviarFase} variante="banda" />
         {/* Jugada rechazada: se dice qué regla se rompió y se anima, igual que
             en el tutorial. Antes solo aparecía una línea fina bajo el tablero. */}
         {fallo && session === 'jugando' ? (
@@ -356,8 +359,6 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
         </div>
         )}
       </Panel>
-
-      <PanelMediacion motor={motor} onEnviar={enviarFase} />
 
       {lastActivation && (
         <Panel style={{ display: 'flex', alignItems: 'center', gap: '12px', background: ppaRgba(lastActivation.fase, 0.08), borderColor: PPA_HEX[lastActivation.fase] }}>

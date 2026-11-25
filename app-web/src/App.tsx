@@ -23,6 +23,7 @@ import PruebaBase from './components/control/PruebaBase'
 import GuiaEncendido from './components/control/GuiaEncendido'
 import { playPpaFeedback, playError, playCountdownBeep } from './core/utils/ppaTones'
 import { PPA_HEX, PPA_TEXT, PPA_LABEL, ppaRgba, AUTO_OFF_MS, type PPAPhase, EFECTOS } from './core/ppa/ppaColors'
+import { efectoCuenta } from './core/ppa/efectosCubo'
 import { type Board, physicalLegalMoves, physicalOffset, physicalWindow, physicalWindowCanonico, computeWinBoard, boardsEqual, isStuck } from './core/simulation/laEscaleraRules'
 import { classifyAttempt, explainError } from './core/simulation/tutor'
 import { useSesion } from './core/session/sesion'
@@ -1602,7 +1603,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // ── Efecto de pulso: cuenta regresiva (EF=6/7, ~300ms) ──────────────────────
   useEffect(() => {
     if (countdownTick === null) return
-    socket.emit('comandoCubo', { id: 'all', efecto: countdownTick === 0 ? EFECTOS.CUENTA_INICIA : EFECTOS.CUENTA_TICK })
+    socket.emit('comandoCubo', { id: 'all', efecto: efectoCuenta(countdownTick) })
   }, [countdownTick])
 
   // ── Vista del jugador (components/jugador/VistaJugador.tsx) ─────────────────
@@ -1875,6 +1876,22 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
               buscando={buscandoConexion}
               acabado={acabadoTablero3D} />
           )}
+          {/* Mediación y control de cubos: banda DENTRO del tablero, a la vista y junto a los cubos que
+              controla; los avisos (y la animación de la regla rota) van debajo y no la desplazan. */}
+          <PanelMediacion
+            variante="banda"
+            motor={motorPpa}
+            onEnviar={enviarFase}
+            destinoConfirmacion={destinoSugerencia}
+            cubos={{
+              seleccionado: selectedCubeId,
+              accionActual: selAction,
+              avisoSinSeleccion: noSelWarning,
+              textoSinSeleccion: 'Haz clic en un cubo del tablero para seleccionarlo',
+              onEstadoInicial: apagarSenal,
+              autoOffS: AUTO_OFF_MS / 1000,
+            }}
+          />
           {pruebaBase && <PruebaBase presencia={presencia} onCerrar={() => setPruebaBase(false)} />}
           {cubosBateriaBaja.length > 0 && (
             <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-offline)' }}>
@@ -1987,24 +2004,6 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
           )}
         </div>
 
-        {/* ── Mediación y control de cubos (T-016): UN solo panel, justo
-             debajo del tablero. Los tres anillos envían Pausar/Pensar/Actuar
-             al cubo seleccionado y el botón «Volver a estado inicial» apaga
-             su señal. Antes había además un panel «Señal PPA» con otros tres
-             botones que hacían lo mismo que los anillos. ── */}
-        <PanelMediacion
-          motor={motorPpa}
-          onEnviar={enviarFase}
-          destinoConfirmacion={destinoSugerencia}
-          cubos={{
-            seleccionado: selectedCubeId,
-            accionActual: selAction,
-            avisoSinSeleccion: noSelWarning,
-            textoSinSeleccion: 'Haz clic en un cubo del tablero para seleccionarlo',
-            onEstadoInicial: apagarSenal,
-            autoOffS: AUTO_OFF_MS / 1000,
-          }}
-        />
 
         {/* ── Grafo de estados del intento físico — el mismo componente y el
              mismo comportamiento que en el tutorial y la simulación libre

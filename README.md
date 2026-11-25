@@ -2,7 +2,7 @@
 
 Herramienta híbrida físico-virtual del juego **La Escalera** (salto de la rana): un tablero de cubos inteligentes (ESP32) y una aplicación web. Las dos comparten el mismo motor de reglas, el grafo del espacio del problema en vivo, las métricas de trayectoria y un protocolo de mediación Pausar–Pensar–Actuar bajo control Mago de Oz.
 
-**Versión actual: 0.14.3** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
+**Versión actual: 0.14.4** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
 
 **Pruébala en el navegador, sin instalar nada:** https://profenapaipa.github.io/NestorTesisMET_Escalera_inteligente/
 
@@ -50,6 +50,7 @@ El software se ha desarrollado y mejorado por etapas. Cada informe, sesión y pa
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.4** | 2026-11-25 | Cuenta regresiva semáforo y mediación en el tablero | La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida. |
 | **0.14.3** | 2026-11-25 | Animación ágil y mediación en un solo panel | Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos. |
 | **0.14.2** | 2026-11-24 | Lo físico y lo virtual sincronizados | La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base. |
 | **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
