@@ -293,3 +293,14 @@ html, body { max-width: 100%; overflow-x: hidden; }
      columna de la versión, que ya no tiene sitio al lado. */
   .historial-versiones__detalle { padding-left: 14px !important; }
 }
+
+/* T-016: foco visible y áreas táctiles del panel único de mediación y control de cubos. */
+.panel-mediacion button:focus-visible,
+.panel-mediacion input:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+.panel-mediacion button { min-height: 44px; }
+@media (max-width: 520px) {
+  .panel-mediacion input[type="range"] { width: 100% !important; }
+}

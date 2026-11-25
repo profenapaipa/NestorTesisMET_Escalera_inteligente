@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
 import {
   type Board, createInitialBoard, computeWinBoard, boardsEqual, isStuck, applyMove,
 } from '../../core/simulation/laEscaleraRules'
 import { classifyAttempt, explainError } from '../../core/simulation/tutor'
 import {
-  PPA_RGB, PPA_HEX, PPA_TEXT, PPA_VIBRATION, PPA_VIB_PATTERN, PPA_SOUND_LABEL, PPA_LABEL, PPA_FRASE,
-  ppaRgba, AUTO_OFF_MS, EFECTOS, type PPAPhase,
+  AUTO_OFF_MS, EFECTOS, type PPAPhase,
 } from '../../core/ppa/ppaColors'
 import { playPpaFeedback, playError } from '../../core/utils/ppaTones'
 import { type DecisionOperador, toCsvDecisionesOperador, downloadFile, nowIso } from '../../core/control/bitacoraControl'
 import AmbientMusicPanel from '../AmbientMusicPanel'
-import { Panel, SectionTitle, Collapsible, LogPanel, TwoColumn, SignalGlyph, Electrode } from '../../ui/brand'
+import { Panel, SectionTitle, Collapsible, LogPanel, TwoColumn } from '../../ui/brand'
 import BotonesMarcadorEeg from '../BotonesMarcadorEeg'
 import { sectionLabel, smallBtn, TEAM_HEX } from '../../ui/styles'
 import PanelMediacion from '../ppa/PanelMediacion'
@@ -136,14 +134,6 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
     fn()
   }
 
-  // Botones de fase con un cubo seleccionado: igual que tocar el anillo.
-  function send(a: PPAPhase) {
-    const id = selectedCubeId!
-    dispararSenal(id, a)
-    cuboObjetivoRef.current = id
-    motor.enviar(a, `Operador envió ${a.toUpperCase()} (simulado) al cubo #${id} por iniciativa propia`)
-  }
-
   // Enciende la señal en pantalla y con sonido; se apaga sola a los 5 s.
   function dispararSenal(id: number, a: PPAPhase) {
     if (offTimers.current[id]) clearTimeout(offTimers.current[id])
@@ -169,14 +159,6 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
   function exportJson() { downloadFile(`bitacora-control-simulado-${Date.now()}.json`, JSON.stringify(events, null, 2), 'application/json') }
 
   const selAction = selectedCubeId !== null ? cubeActions[selectedCubeId] : undefined
-  const signalBtn = (a: PPAPhase): React.CSSProperties => ({
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    padding: '14px 10px', borderRadius: 'var(--radius)', cursor: 'pointer',
-    background: selAction === a ? ppaRgba(a, 0.10) : 'var(--color-panel)',
-    border: `${selAction === a ? 2 : 1}px solid ${selAction === a ? PPA_HEX[a] : 'var(--color-line)'}`,
-    opacity: selectedCubeId === null ? 0.5 : 1,
-  })
-
   const main = (
     <>
       <Panel>
@@ -213,54 +195,22 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
         )}
       </Panel>
 
-      <Panel>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', marginBottom: '12px',
-          background: 'var(--color-bg)', borderRadius: 'var(--radius)', fontSize: '12px',
-          border: `1px solid ${noSelWarning ? 'var(--color-offline)' : 'var(--color-line)'}`,
-        }}>
-          {noSelWarning ? (
-            <><TriangleAlert size={13} color="var(--color-offline)" /><span style={{ color: 'var(--color-offline)' }}>Selecciona un cubo del tablero antes de enviar una señal</span></>
-          ) : selectedCubeId !== null ? (
-            <>
-              <Electrode on />
-              <span style={{ color: 'var(--color-paper-dim)' }}>Cubo seleccionado:</span>
-              <span style={{ fontWeight: 600 }}>#{selectedCubeId}</span>
-              {selAction && <span style={{ color: 'var(--color-paper-dim)' }}>— acción actual: <span style={{ color: PPA_TEXT[selAction], fontWeight: 600 }}>{PPA_LABEL[selAction]}</span></span>}
-            </>
-          ) : (
-            <><Electrode on={false} /><span style={{ color: 'var(--color-paper-faint)' }}>Toca un cubo del tablero para seleccionarlo</span></>
-          )}
-        </div>
-        <div className="rejilla-ppa" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
-          {(['pausar', 'pensar', 'actuar'] as const).map(a => (
-            <button key={a} onClick={() => guarded(() => send(a))} style={signalBtn(a)}>
-              <SignalGlyph phase={a} color={PPA_TEXT[a]} />
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.06em', color: PPA_TEXT[a] }}>{PPA_LABEL[a]}</div>
-                <div style={{ fontSize: '10px', color: 'var(--color-paper-faint)', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>
-                  {PPA_RGB[a].join(',')} · {Math.round(PPA_VIBRATION[a] * 100)}% ({PPA_VIB_PATTERN[a].patron}) · {PPA_SOUND_LABEL[a]}
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--color-paper-faint)', marginTop: '2px', fontStyle: 'italic' }}>{PPA_FRASE[a]}</div>
-              </div>
-            </button>
-          ))}
-          <button onClick={() => guarded(apagar)} style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            padding: '14px 10px', borderRadius: 'var(--radius)', cursor: 'pointer',
-            background: 'var(--color-panel)', border: '1px solid var(--color-line)', opacity: selectedCubeId === null ? 0.5 : 1,
-          }}>
-            <svg width="32" height="22" viewBox="0 0 32 22" fill="none" aria-hidden="true">
-              <circle cx="16" cy="11" r="8" stroke="var(--color-paper-dim)" strokeWidth="1.6" />
-              <line x1="16" y1="4" x2="16" y2="11" stroke="var(--color-paper-dim)" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.06em', color: 'var(--color-paper-dim)' }}>ESTADO INICIAL</div>
-              <div style={{ fontSize: '10px', color: 'var(--color-paper-faint)', marginTop: '3px' }}>Apaga color y vibración · auto {AUTO_OFF_MS / 1000}s</div>
-            </div>
-          </button>
-        </div>
-      </Panel>
+      {/* Mediación y control de cubos (T-016): un solo panel con anillos,
+          cubo seleccionado y «Volver a estado inicial». Antes había además
+          un panel con otros tres botones PPA repetidos. */}
+      <PanelMediacion
+        motor={motor}
+        onEnviar={enviarFase}
+        destinoConfirmacion={selectedCubeId !== null ? `irá al cubo #${selectedCubeId}` : motor.sugerencia?.cuboSugerido ? `irá al cubo #${motor.sugerencia.cuboSugerido}` : 'selecciona antes un cubo'}
+        cubos={{
+          seleccionado: selectedCubeId,
+          accionActual: selAction,
+          avisoSinSeleccion: noSelWarning,
+          textoSinSeleccion: 'Toca un cubo del tablero para seleccionarlo',
+          onEstadoInicial: () => guarded(apagar),
+          autoOffS: AUTO_OFF_MS / 1000,
+        }}
+      />
 
       <Collapsible title="Histórico — bitácora del operador (simulado)" open={logOpen} onToggle={() => setLogOpen(o => !o)}>
         <LogPanel
@@ -275,11 +225,6 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
 
   const side = (
     <>
-      <PanelMediacion
-        motor={motor}
-        onEnviar={enviarFase}
-        destinoConfirmacion={selectedCubeId !== null ? `irá al cubo #${selectedCubeId}` : motor.sugerencia?.cuboSugerido ? `irá al cubo #${motor.sugerencia.cuboSugerido}` : 'selecciona antes un cubo'}
-      />
       <Panel>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={sectionLabel}>Señal sonora PPA</div>

@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { PPA_RGB, PPA_TEXT, PPA_VIBRATION, PPA_VIB_PATTERN, INVALIDO_HEX, type PPAPhase } from '../../core/ppa/ppaColors'
 import type { CeldaTablero, CuboLevantado, CubeVisual } from './TableroFisico'
 import {
@@ -56,7 +56,7 @@ const ELEV_SELECCION = 0.04
 /** Arco del cubo levantado al cambiar de casilla: altura máxima extra (en w) para pasar por encima de los vecinos. */
 const ARCO = 0.9
 const PROFUNDIDAD_POZO = 0.1
-const ENCAJE_MS = 340
+const ENCAJE_MS = 270 // antes 340: movimiento más ágil (2026-11-25)
 // Impacto (2026-11-24, sincronía con el sonido): el cubo ya no «se posa» frenando —tardaba ~60 ms en
 // recorrer los últimos 4 px y no había un instante visible de contacto—, sino que cae acelerando, como
 // cuando el imán lo jala, y golpea la base exactamente al terminar la transición. Mover, bajar y
@@ -305,72 +305,91 @@ function poroProps(uid: string, opacidad: number) {
 type Curva = 'out' | 'lineal' | 'caida'
 type Spec = { key: string; target: number; dur: number; entra?: number; curva?: Curva }
 type Tween = { from: number; to: number; t0: number; dur: number; curva: Curva }
-type Estado = {
-  prev: Map<string, number>
-  tw: Map<string, Tween>
-  cur: Record<string, number>
-  raf: number
-  montado: boolean
-}
-
 const suave = (t: number) => 1 - Math.pow(1 - t, 3) // easeOutCubic
 const curvaDe = (tw: Tween, t: number) =>
   tw.curva === 'lineal' ? t : tw.curva === 'caida' && tw.to < tw.from ? t * t * t : suave(t)
 
-function paso(e: Estado, fijar: (v: Record<string, number>) => void) {
-  const marco = (t: number) => {
-    for (const [k, tw] of e.tw) {
-      const q = Math.min(1, Math.max(0, (t - tw.t0) / tw.dur))
-      if (q >= 1) { e.tw.delete(k); delete e.cur[k] } else e.cur[k] = tw.from + (tw.to - tw.from) * curvaDe(tw, q)
-    }
-    fijar({ ...e.cur })
-    e.raf = e.tw.size ? requestAnimationFrame(marco) : 0
-  }
-  return marco
-}
+/** Animador del tablero (2026-11-25, pedido del autor: «que llame a la función de la animación»).
+ *  Vive FUERA de React: guarda los valores animados (posición X, elevación, luz y anillo de cada
+ *  cubo) y los interpola con un solo requestAnimationFrame. Cada pieza (cubo, haz, anillo) se suscribe
+ *  solo a sus claves, así que en cada cuadro se redibuja únicamente lo que se mueve; el tablero completo
+ *  se vuelve a dibujar una sola vez al empezar y otra al terminar el movimiento. */
+class Animador {
+  private prev = new Map<string, number>()
+  private tw = new Map<string, Tween>()
+  private cur = new Map<string, number>()
+  private subs = new Map<string, Set<() => void>>()
+  private raf = 0
+  private montado = false
+  alTerminar: (() => void) | null = null
 
-/** Devuelve valores interpolados solo mientras dura una transición; en reposo no hay bucle. */
-function useAnimador(specs: Spec[]) {
-  const [vals, setVals] = useState<Record<string, number>>({})
-  const est = useRef<Estado>({ prev: new Map(), tw: new Map(), cur: {}, raf: 0, montado: false })
-  // Corre en cada render a propósito: compara los objetivos nuevos con los anteriores.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => {
-    const e = est.current
-    const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  valor(key: string, objetivo: number) { return this.cur.get(key) ?? objetivo }
+  transicion(key: string) { return this.tw.get(key) }
+  enMovimiento(key: string) { return this.tw.has(key) }
+
+  suscribir(key: string, cb: () => void) {
+    let s = this.subs.get(key)
+    if (!s) this.subs.set(key, (s = new Set()))
+    s.add(cb)
+    return () => { s!.delete(cb) }
+  }
+
+  /** Recibe los objetivos del render y arranca una transición por cada objetivo que cambió. Se llama al
+   *  dibujar el tablero, antes que sus piezas, para que cada una lea ya su valor de partida. */
+  sincronizar(specs: Spec[]) {
+    const reducido = typeof window !== 'undefined' && window.matchMedia(REDUCIDO).matches
     const ahora = performance.now()
-    let cambio = false
     const vivas = new Set<string>()
     for (const s of specs) {
       vivas.add(s.key)
-      const antes = e.prev.get(s.key)
-      e.prev.set(s.key, s.target)
-      // Solo hay transición cuando cambia el objetivo (o aparece una clave con valor de entrada).
-      const cambiaObjetivo = antes === undefined ? e.montado && s.entra !== undefined : antes !== s.target
-      if (!cambiaObjetivo) continue
-      const desde = antes === undefined ? (s.entra as number) : (e.cur[s.key] ?? antes)
-      if (reducido || desde === s.target) {
-        if (e.tw.delete(s.key)) delete e.cur[s.key]
-        cambio = true
-        continue
-      }
-      e.tw.set(s.key, { from: desde, to: s.target, t0: ahora, dur: s.dur, curva: s.curva ?? 'out' })
-      e.cur[s.key] = desde
-      cambio = true
+      const antes = this.prev.get(s.key)
+      this.prev.set(s.key, s.target)
+      const cambia = antes === undefined ? this.montado && s.entra !== undefined : antes !== s.target
+      if (!cambia) continue
+      const desde = antes === undefined ? (s.entra as number) : (this.cur.get(s.key) ?? antes)
+      if (reducido || desde === s.target) { this.tw.delete(s.key); this.cur.delete(s.key); continue }
+      this.tw.set(s.key, { from: desde, to: s.target, t0: ahora, dur: s.dur, curva: s.curva ?? 'out' })
+      this.cur.set(s.key, desde)
     }
-    for (const k of [...e.prev.keys()]) {
+    for (const k of [...this.prev.keys()]) {
       if (vivas.has(k)) continue
-      e.prev.delete(k); e.tw.delete(k); delete e.cur[k]
+      this.prev.delete(k); this.tw.delete(k); this.cur.delete(k)
     }
-    e.montado = true
-    if (cambio) setVals({ ...e.cur })
-    if (e.tw.size && !e.raf) e.raf = requestAnimationFrame(paso(e, setVals))
-  })
-  useEffect(() => {
-    const e = est.current
-    return () => { if (e.raf) cancelAnimationFrame(e.raf); e.raf = 0 }
-  }, [])
-  return vals
+    this.montado = true
+    if (this.tw.size && !this.raf && typeof requestAnimationFrame !== 'undefined') this.raf = requestAnimationFrame(this.marco)
+  }
+
+  private marco = (t: number) => {
+    this.raf = 0
+    let termino = false
+    for (const [k, tw] of this.tw) {
+      const q = Math.min(1, Math.max(0, (t - tw.t0) / tw.dur))
+      if (q >= 1) { this.tw.delete(k); this.cur.delete(k); termino = true } else this.cur.set(k, tw.from + (tw.to - tw.from) * curvaDe(tw, q))
+      const s = this.subs.get(k)
+      if (s) for (const cb of s) cb()
+    }
+    if (this.tw.size) this.raf = requestAnimationFrame(this.marco)
+    if (termino) this.alTerminar?.()
+  }
+
+  detener() { if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0 }
+}
+
+/** Valor animado de una clave; solo el componente que lo usa se actualiza en cada cuadro. */
+function useValor(anim: Animador, key: string, objetivo: number) {
+  const suscribir = useCallback((cb: () => void) => anim.suscribir(key, cb), [anim, key])
+  return useSyncExternalStore(suscribir, () => anim.valor(key, objetivo), () => objetivo)
+}
+
+/** Posición y elevación vivas de un cubo, con el arco del vuelo entre casillas (balístico: sube y cae
+ *  acelerando, porque X avanza a velocidad constante). */
+function usePoseCubo(anim: Animador, id: number, objX: number, objLift: number, objLed: number) {
+  const X = useValor(anim, `x:${id}`, objX)
+  const lift = useValor(anim, `lift:${id}`, objLift)
+  const led = useValor(anim, `led:${id}`, objLed)
+  const tw = anim.transicion(`x:${id}`)
+  const q = tw && tw.to !== tw.from ? Math.min(1, Math.max(0, (X - tw.from) / (tw.to - tw.from))) : 1
+  return { X, elev: lift + ARCO * 4 * q * (1 - q), led }
 }
 
 /* ---------- Colores de la base por acabado: [arriba, abajo] del degradado de cada cara ---------- */
@@ -1004,6 +1023,30 @@ function BotonSonidoEncaje() {
   )
 }
 
+/* ---------- Piezas vivas: leen su pose del animador y se redibujan solas ---------- */
+
+type PropsVivas = { anim: Animador; objX: number; objLift: number; objLed: number }
+
+const CuboVivo = memo(function CuboVivo({ anim, objX, objLift, objLed, ...props }: PropsVivas & Omit<CuboProps, 'luz' | 'X' | 'elev' | 'led'> & { luzHex?: string; luzPatron?: Patron }) {
+  const { X, elev, led } = usePoseCubo(anim, props.id, objX, objLift, objLed)
+  return <CuboMemo {...props} X={X} elev={elev} led={led} />
+})
+
+const HazVivo = memo(function HazVivo({ anim, objX, objLift, objLed, E, ...props }: PropsVivas & {
+  uid: string; id: number; luzHex: string; luzPatron: Patron; luzEtiqueta?: string; fase?: Patron; t0?: number; efN?: number; efT0?: number; E: Escena
+}) {
+  const { X, elev, led } = usePoseCubo(anim, props.id, objX, objLift, objLed)
+  if (!(led > 0.001)) return null
+  const [cx, cy] = E.p(E.girar(X, elev, 0).pt(0, 1, 0.5))
+  return <HazSenal {...props} E={E} X={X} cx={cx} cy={cy} led={led} />
+})
+
+const AroVivo = memo(function AroVivo({ anim, posicion, objetivo, puntos }: { anim: Animador; posicion: number; objetivo: number; puntos: string }) {
+  const sel = useValor(anim, `sel:${posicion}`, objetivo)
+  if (!(sel > 0.005)) return null
+  return <polygon points={puntos} fill="none" stroke="#e7edee" strokeWidth="1.8" strokeLinejoin="round" opacity={sel} style={{ filter: 'drop-shadow(0 0 4px rgba(231,237,238,.75))' }} />
+})
+
 /* ---------- Tablero ---------- */
 
 export default function Tablero3D({
@@ -1060,48 +1103,41 @@ export default function Tablero3D({
   const specs: Spec[] = []
   for (const c of casillas) {
     const sel = Boolean(c.id) && seleccionado === c.id
-    specs.push({ key: `sel:${c.posicion}`, target: sel ? 1 : 0, dur: 180 })
+    specs.push({ key: `sel:${c.posicion}`, target: sel ? 1 : 0, dur: 140 })
     if (c.id && c.visual) {
       specs.push({ key: `x:${c.id}`, target: xCasilla(c.posicion + 1), dur: CONTACTO_MS, curva: 'lineal' })
-      specs.push({ key: `lift:${c.id}`, target: (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0), dur: c.levantado ? 200 : ENCAJE_MS, curva: 'caida' })
-      specs.push({ key: `led:${c.id}`, target: luzDe(c.visual) ? 1 : 0, dur: 220, entra: 0 })
+      specs.push({ key: `lift:${c.id}`, target: (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0), dur: c.levantado ? 150 : ENCAJE_MS, curva: 'caida' })
+      specs.push({ key: `led:${c.id}`, target: luzDe(c.visual) ? 1 : 0, dur: 180, entra: 0 })
     }
   }
-  const vals = useAnimador(specs)
+  // Un animador por tablero. Se sincroniza al dibujar (antes que las piezas, que así ya leen su valor
+  // de partida); al terminar un movimiento se vuelve a dibujar una vez para reordenar la escena.
+  const animRef = useRef<Animador | null>(null)
+  if (!animRef.current) animRef.current = new Animador()
+  const anim = animRef.current
+  anim.sincronizar(specs)
+  const [, setFinMovimiento] = useState(0)
+  useEffect(() => {
+    anim.alTerminar = () => setFinMovimiento(n => n + 1)
+    return () => { anim.alTerminar = null; anim.detener() }
+  }, [anim])
   const equipoCubo = (id: number): 'A' | 'B' => (equipoDe ? equipoDe(id) : id <= 5 ? 'A' : 'B')
-  const v = (key: string, target: number) => vals[key] ?? target
 
   const pxW = E.pxPorW()
   const pasoPx = pxW * PASO
-  const recorridos = useRef(new Map<number, { from: number; to: number }>())
+  // Objetivos de cada cubo (dónde termina); la pose viva la leen sus piezas del animador.
   const cubos = casillas
     .filter(c => c.id && c.visual)
     .map(c => {
       const sel = seleccionado === c.id
-      const X = v(`x:${c.id}`, xCasilla(c.posicion + 1))
-      const elev = v(`lift:${c.id}`, (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0))
-      const led = v(`led:${c.id}`, luzDe(c.visual!) ? 1 : 0)
-      // Arco: al cambiar de casilla el cubo sube por encima de los vecinos y vuelve a bajar.
-      const objetivo = xCasilla(c.posicion + 1)
-      const rec = recorridos.current.get(c.id)
-      const desde = rec ? (rec.to !== objetivo ? rec.to : rec.from) : objetivo
-      const D = Math.abs(objetivo - desde)
-      const q = D > 0.01 ? Math.min(1, Math.max(0, 1 - Math.abs(X - objetivo) / D)) : 0
-      // Vuelo balístico: sube y cae acelerando (parábola en el tiempo, porque X avanza a velocidad
-      // constante), así que toca la base con un golpe y no posándose.
-      const arco = ARCO * 4 * q * (1 - q)
-      return { ...c, sel, X, elev: elev + arco, objetivo, led, luz: luzDe(c.visual!) }
+      const X = xCasilla(c.posicion + 1)
+      const elev = (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0)
+      const luz = luzDe(c.visual!)
+      const arriba = sel || elev > 0.2 || anim.enMovimiento(`x:${c.id}`) || anim.enMovimiento(`lift:${c.id}`)
+      return { ...c, sel, X, elev, led: luz ? 1 : 0, luz, arriba }
     })
-    // Lo lejano primero; el seleccionado y los levantados quedan encima.
-    .sort((a, b) => Number(a.sel || a.elev > 0.2) - Number(b.sel || b.elev > 0.2) || Math.abs(b.X) - Math.abs(a.X))
-
-  useEffect(() => {
-    for (const c of cubos) {
-      const r = recorridos.current.get(c.id)
-      if (!r) recorridos.current.set(c.id, { from: c.objetivo, to: c.objetivo })
-      else if (r.to !== c.objetivo) recorridos.current.set(c.id, { from: r.to, to: c.objetivo })
-    }
-  })
+    // Lo lejano primero; el seleccionado, los levantados y los que están en vuelo quedan encima.
+    .sort((a, b) => Number(a.arriba) - Number(b.arriba) || Math.abs(b.X) - Math.abs(a.X))
 
   const iniciosEf = useIniciosEfecto(cubos.flatMap(c => c.visual?.efecto ? [{ id: c.id, n: c.visual.efecto.n, clave: c.visual.efecto.clave }] : []))
   const inicios = useIniciosSenal(cubos.filter(c => (c.luz && c.luz.patron !== 'fijo') || (!c.luz && c.desconectado)).map(c => ({ id: c.id, fase: c.luz ? c.luz.patron : ('flota' as Patron) })))
@@ -1196,7 +1232,6 @@ export default function Tablero3D({
             <BandejaMemo mdf={mdf} uid={uid} E={E} caras={BANDEJAS[acabado]} />
             {casillas.map(c => {
               const X = xCasilla(c.posicion + 1)
-              const sel = v(`sel:${c.posicion}`, seleccionado === c.id && c.id ? 1 : 0)
               const pozo = !c.id || Boolean(c.levantado)
               const aro = contornoRanura(X, 0.07)
               return (
@@ -1205,20 +1240,19 @@ export default function Tablero3D({
                   {c.celda?.legal && (
                     <polygon points={poly(aro)} fill="rgba(0,204,68,.1)" stroke="#00cc44" strokeWidth="2" strokeLinejoin="round" strokeOpacity=".9" />
                   )}
-                  {sel > 0.005 && (
-                    <polygon points={poly(aro)} fill="none" stroke="#e7edee" strokeWidth="1.8" strokeLinejoin="round" opacity={sel} style={{ filter: 'drop-shadow(0 0 4px rgba(231,237,238,.75))' }} />
-                  )}
+                  <AroVivo anim={anim} posicion={c.posicion} objetivo={seleccionado === c.id && c.id ? 1 : 0} puntos={poly(aro)} />
                 </g>
               )
             })}
             {cubos.map(c => (
-              <CuboMemo
+              <CuboVivo
                 key={c.id}
+                anim={anim}
+                objX={c.X}
+                objLift={c.elev}
+                objLed={c.led}
                 uid={uid}
                 id={c.id}
-                X={c.X}
-                elev={c.elev}
-                led={c.led}
                 desconectado={c.desconectado}
                 buscando={buscando}
                 numero={c.id}
@@ -1234,20 +1268,19 @@ export default function Tablero3D({
                 E={E}
               />
             ))}
-            {cubos.filter(c => c.luz && c.led > 0.001).map(c => {
-              const [hx, hy] = p(E.girar(c.X, c.elev, 0).pt(0, 1, 0.5))
+            {cubos.filter(c => c.luz).map(c => {
               return (
-                <HazSenal
+                <HazVivo
                   key={`haz-${c.id}`}
+                  anim={anim}
+                  objX={c.X}
+                  objLift={c.elev}
+                  objLed={c.led}
                   uid={uid}
                   id={c.id}
                   luzHex={c.luz!.hex}
                   luzPatron={c.luz!.patron}
                   luzEtiqueta={c.luz!.etiqueta}
-                  X={c.X}
-                  cx={hx}
-                  cy={hy}
-                  led={c.led}
                   fase={inicios[c.id]?.fase}
                   t0={inicios[c.id]?.t0}
                   efN={iniciosEf[c.id]?.n}

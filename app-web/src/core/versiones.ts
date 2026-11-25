@@ -30,6 +30,17 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.3', fecha: '2026-11-25', publica: true,
+    titulo: 'Animación ágil y mediación en un solo panel',
+    cambios: 'Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos.',
+    detalle: [
+      m('Animación de los cubos más ágil: encaje y vuelo en 270 ms (antes 340), levantar en 150 ms; el sonido de encaje sigue sonando en el instante del golpe.'),
+      m('Más fluida en cualquier equipo: un animador único mueve cada cubo, su haz de luz y su anillo por separado; el tablero completo ya no se vuelve a dibujar en cada cuadro.'),
+      m('Mediación y control de cubos en un solo panel, justo debajo del tablero (Control y Control simulado): el cubo seleccionado, los tres anillos Pausar/Pensar/Actuar, el botón «Volver a estado inicial» y el umbral de Actuar.'),
+      c('Control y Control simulado tenían dos juegos de botones que enviaban lo mismo (el panel «Señal PPA» y los anillos); queda uno solo. Lo que se envía a los cubos no cambia.'),
+    ],
+  },
+  {
     version: '0.14.2', fecha: '2026-11-24', publica: true,
     titulo: 'Lo físico y lo virtual sincronizados',
     cambios: 'La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base.',

@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.3** | 2026-11-25 | Animación ágil y mediación en un solo panel | Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos. |
 | **0.14.2** | 2026-11-24 | Lo físico y lo virtual sincronizados | La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base. |
 | **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
 | **0.14.0** | 2026-11-23 | Tablero 3D realista y órdenes con confirmación | Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían. |
@@ -40,6 +41,12 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.3 · 2026-11-25 · animación ágil y mediación en un solo panel
+
+- **Animación más ágil y fluida:** encaje y vuelo en 270 ms (antes 340). Un animador fuera de React (`Animador` en `Tablero3D.tsx`) interpola posición, elevación, luz y anillo con un solo `requestAnimationFrame`; cada cubo, haz y anillo se suscribe solo a sus valores, así que en cada cuadro se redibuja únicamente lo que se mueve. Sonido de encaje medido a −5…+1 ms del golpe.
+- **Mediación en un solo panel:** «Mediación y control de cubos» bajo el tablero en Control y Control simulado: cubo seleccionado, anillos Pausar/Pensar/Actuar, «Volver a estado inicial» y umbral de Actuar; responsive (390 px sin desborde), botones de 44 px y foco visible.
+- **Corrección: controles duplicados.** El panel «Señal PPA» repetía lo que hacen los anillos; se retiró. Los comandos a los cubos y el motor PPA no cambian.
 
 ## 0.14.2 · 2026-11-24 · lo físico y lo virtual sincronizados
 
