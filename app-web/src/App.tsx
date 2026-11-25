@@ -703,7 +703,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // Mismo resolutor que decide el comando físico (ESTADO_VISUAL_CUBOS.md):
   // pantalla y cubo real nunca discrepan.
   const visualDe = (id: number): CubeVisual =>
-    resolveCubeDisplay(sessionVisualTier(sessionState), flashCubeId === id, cubeActions[id], id <= 5 ? teamAColor : teamBColor, fueraDeLugarIds.includes(id))
+    resolveCubeDisplay(sessionVisualTier(sessionState), flashCubeId === id, cubeActions[id], id <= 5 ? teamAColor : teamBColor, fueraDeLugarIds.includes(id), countdownTick)
   const offVentana = 5 - pares
   // Cubos en la mano: estaban en el último tablero asentado y ahora no
   // aparecen en ninguna casilla — se dibujan flotando sobre la que dejaron.

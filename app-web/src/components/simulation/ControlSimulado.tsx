@@ -6,7 +6,7 @@ import {
 import { classifyAttempt, explainError } from '../../core/simulation/tutor'
 import {
   PPA_RGB, PPA_HEX, PPA_TEXT, PPA_VIBRATION, PPA_VIB_PATTERN, PPA_SOUND_LABEL, PPA_LABEL, PPA_FRASE,
-  ppaRgba, AUTO_OFF_MS, type PPAPhase,
+  ppaRgba, AUTO_OFF_MS, EFECTOS, type PPAPhase,
 } from '../../core/ppa/ppaColors'
 import { playPpaFeedback, playError } from '../../core/utils/ppaTones'
 import { type DecisionOperador, toCsvDecisionesOperador, downloadFile, nowIso } from '../../core/control/bitacoraControl'
@@ -199,7 +199,8 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
           selected={selectedPos} onSelect={i => { setSelectedPos(i); setErrorCell(null) }}
           onTapPiece={i => { const p = board[i]; if (p) setSelectedCubeId(p.id) }}
           onMove={handleMove} onInvalid={handleInvalid}
-          errorCell={errorCell} cubeActions={cubeActions} />
+          errorCell={errorCell} cubeActions={cubeActions}
+          efectoSesion={status === 'victoria' ? { n: EFECTOS.VICTORIA, clave: `v${moves}` } : status === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${moves}` } : null} />
         {(lastError || status !== 'jugando') && (
           <div style={{
             marginTop: '12px', padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--color-bg)', fontSize: '13px',

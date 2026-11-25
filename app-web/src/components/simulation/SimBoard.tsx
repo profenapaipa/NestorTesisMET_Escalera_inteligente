@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { type Board, legalMovesFor } from '../../core/simulation/laEscaleraRules'
-import { PPA_HEX, INVALIDO_HEX, type PPAPhase } from '../../core/ppa/ppaColors'
+import { PPA_HEX, INVALIDO_HEX, BLANCO_HEX, EFECTOS, type PPAPhase } from '../../core/ppa/ppaColors'
 import { TEAM_HEX } from '../../ui/styles'
 import Tablero3D, { type AcabadoTablero3D } from '../control/Tablero3D'
-import type { CeldaTablero } from '../control/TableroFisico'
+import type { CeldaTablero, CubeVisual } from '../control/TableroFisico'
 
 // Tablero de la simulación, compartido por el tutorial, la práctica libre
 // y el control simulado. Dos formas de mover, para que sirva igual a un
@@ -23,8 +23,10 @@ export type BoardHint = { from: number; to: number } | null
 function SimBoard({
   board, disabled = false, selected, onSelect, onMove, onInvalid, onTapPiece,
   hint = null, errorCell = null, showArrows = false, showLegalTargets = true, cubeActions, prev = null,
-  permitir3d = false,
+  permitir3d = false, efectoSesion = null,
 }: {
+  // Efecto de sesión del firmware (bloqueo, victoria, cuenta regresiva) para los 10 cubos, como en el físico.
+  efectoSesion?: { n: number; clave: string } | null
   // Muestra el selector 2D/3D (Simulación libre y Control simulado). Por omisión 3D MDF; 2D queda en el selector.
   permitir3d?: boolean
   board: Board
@@ -247,8 +249,17 @@ function SimBoard({
   }
 
   const en3d = permitir3d && vista === '3d'
+  // Mismo orden de prioridad que Control (ESTADO_VISUAL_CUBOS.md): bloqueo/victoria > inválido > señal > equipo.
+  // Bloqueo y victoria terminan en blanco fijo; la cuenta regresiva vuelve al color de equipo.
+  const visualSim = (id: number, equipo: string): CubeVisual => {
+    if (efectoSesion && (efectoSesion.n === EFECTOS.BLOQUEO || efectoSesion.n === EFECTOS.VICTORIA))
+      return { hex: BLANCO_HEX, pulso: true, efecto: efectoSesion }
+    if (id === flashId) return { hex: INVALIDO_HEX, pulso: true }
+    if (efectoSesion) return { hex: equipo, efecto: efectoSesion }
+    return { hex: equipo, accion: cubeActions?.[id] }
+  }
   const celdas3d: CeldaTablero[] = board.map((cell, i) => cell
-    ? { id: cell.id, visual: cell.id === flashId ? { hex: INVALIDO_HEX, pulso: true as const } : { hex: TEAM_HEX[cell.team], accion: cubeActions?.[cell.id] }, conectado: !busca || busca.conectados.includes(cell.id) }
+    ? { id: cell.id, visual: visualSim(cell.id, TEAM_HEX[cell.team]), conectado: !busca || busca.conectados.includes(cell.id) }
     : { id: 0, visual: { hex: EMPTY_HEX }, legal: (showLegalTargets && legalTargets.includes(i)) || hint?.to === i })
 
   return (

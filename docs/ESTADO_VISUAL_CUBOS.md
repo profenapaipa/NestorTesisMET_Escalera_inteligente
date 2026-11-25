@@ -17,6 +17,25 @@ real todavía** — ver la sección de estado al final de este documento.
 
 ---
 
+## Pantalla y cubo físico: mismos efectos, paso a paso (2026-11-24)
+
+Los efectos `EF=<n>` del firmware ya no se resumen en pantalla con su color final: el tablero 3D
+(Control, Simulación libre, Control simulado) reproduce la **misma secuencia** que ejecuta el cubo,
+con el mismo color, la misma vibración y la misma duración en cada paso. La tabla vive en
+`front-juego-acacia/src/core/ppa/efectosCubo.ts`, copia fiel de las tablas `EFECTO_<n>_*` de
+`Cubo_Esclavo_v3.ino`, y la auditoría `npm run efectos:verificar` (incluida en el commit doble)
+compara ambas y falla si alguien cambia una sin la otra.
+
+| Efecto | Cubo físico y pantalla |
+|---|---|
+| EF=4 Bloqueo | rojo con vibración decreciente (0,90 → 0,15), 4 × 500 ms → **blanco fijo** (pide volver a la posición inicial) |
+| EF=5 Victoria | verde / dorado alternando con vibración 0,6, 4 × 400 ms → **blanco fijo** |
+| EF=6 / EF=7 Cuenta regresiva | destello cian 300 ms por número / verde 300 ms al «¡Inicia!» → color de equipo |
+| EF=3 Inválido | naranja con vibración 0,7, 1 s → color de equipo (ya coincidía) |
+
+Un efecto que ya estaba en curso al abrir una pestaña no se repite en pantalla (el cubo tampoco lo repite).
+Pendiente de mesa: comprobar con los cubos reales que la pantalla y el cubo cambian de paso al mismo tiempo.
+
 ## Por qué dos niveles, no una lista plana
 
 Las condiciones de color/vibración de un cubo tienen alcance distinto:

@@ -14,7 +14,10 @@ import IndicadorBateria from './IndicadorBateria'
 import { PuntoConexion } from '../../ui/brand'
 import type { PPAPhase } from '../../core/ppa/ppaColors'
 
-export type CubeVisual = { hex: string; accion?: PPAPhase; pulso?: true }
+// `efecto`: secuencia EF=<n> del firmware que el cubo físico está ejecutando (efectosCubo.ts); la pantalla
+// la reproduce paso a paso y luego queda en `hex`. `clave` distingue una ocurrencia de la siguiente.
+export type EfectoVisual = { n: number; clave: string }
+export type CubeVisual = { hex: string; accion?: PPAPhase; pulso?: true; efecto?: EfectoVisual }
 
 export type CeldaTablero = {
   id: number            // 0 = casilla vacía

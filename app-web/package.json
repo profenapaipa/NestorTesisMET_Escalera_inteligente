@@ -1,7 +1,7 @@
 {
   "name": "front-juego-acacia",
   "private": true,
-  "version": "0.14.1",
+  "version": "0.14.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "caminos:verificar": "esbuild scripts/verificarCaminos.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verificarCaminos.cjs --log-level=error && node node_modules/.cache/verificarCaminos.cjs",
     "sesiones:generar": "esbuild scripts/generarSesionesSinteticas.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/generarSesionesSinteticas.cjs --log-level=error && node node_modules/.cache/generarSesionesSinteticas.cjs",
     "datos:verificar": "esbuild scripts/verificarPaquete.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verificarPaquete.cjs --log-level=error && node node_modules/.cache/verificarPaquete.cjs",
+    "efectos:verificar": "esbuild scripts/verificarEfectos.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verificarEfectos.cjs --log-level=error && node node_modules/.cache/verificarEfectos.cjs",
     "ppa:verificar": "esbuild scripts/verificarMotorPpa.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verificarMotorPpa.cjs --log-level=error && node node_modules/.cache/verificarMotorPpa.cjs",
     "importacion:verificar": "esbuild scripts/verificarImportacion.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verificarImportacion.cjs --log-level=error && node node_modules/.cache/verificarImportacion.cjs"
   },

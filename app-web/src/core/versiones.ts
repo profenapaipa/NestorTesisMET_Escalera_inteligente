@@ -30,6 +30,17 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.2', fecha: '2026-11-24', publica: true,
+    titulo: 'Lo físico y lo virtual sincronizados',
+    cambios: 'La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base.',
+    detalle: [
+      c('Al perder, el tablero en pantalla saltaba directo a blanco (en Control) o no mostraba nada (en las simulaciones); ahora hace lo mismo que los cubos: rojo con vibración que se apaga y luego blanco fijo para volver a la posición inicial.'),
+      m('Victoria y cuenta regresiva también como en el cubo: verde y dorado alternando antes del blanco fijo, y un destello en cada número (verde en «¡Inicia!»).'),
+      n('Auditoría nueva: compara los efectos de la pantalla con las tablas del firmware y bloquea la publicación si dejan de coincidir.'),
+      c('El sonido de encaje llegaba tarde. Ahora el cubo cae acelerando, como cuando lo jala el imán, y golpea la base en un instante preciso; el sonido se programa en el reloj de audio para ese instante, descontando la latencia de la tarjeta de sonido.'),
+    ],
+  },
+  {
     version: '0.14.1', fecha: '2026-11-24', publica: true,
     titulo: 'Juego fluido en cualquier equipo y sonido de encaje',
     cambios: 'El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón.',

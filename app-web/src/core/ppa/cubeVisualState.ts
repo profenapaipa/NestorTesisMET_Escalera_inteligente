@@ -109,14 +109,20 @@ export function resolveCubeDisplay(
   accionCubo: PPAPhase | undefined,
   teamHex: string,
   fueraDeLugar = false,
-): { hex: string; accion?: PPAPhase; pulso?: true } {
+  cuentaTick: number | null = null,
+): { hex: string; accion?: PPAPhase; pulso?: true; efecto?: { n: number; clave: string } } {
   // `pulso` marca los dos estados transitorios de mayor prioridad (antes
   // "flashColor" en Cube.tsx) para que la interfaz les dé el mismo anillo
   // de brillo que ya tenían, distinto del anillo blanco de una señal PPA.
-  if (sessionTier === 'bloqueado' || sessionTier === 'victoria') return { hex: BLANCO_HEX, pulso: true }
+  // Bloqueo y victoria: la pantalla reproduce la misma secuencia EF=4/EF=5 que el cubo y termina,
+  // como él, en blanco fijo (pide volver a la posición inicial).
+  if (sessionTier === 'bloqueado') return { hex: BLANCO_HEX, pulso: true, efecto: { n: EFECTOS.BLOQUEO, clave: 'bloqueo' } }
+  if (sessionTier === 'victoria') return { hex: BLANCO_HEX, pulso: true, efecto: { n: EFECTOS.VICTORIA, clave: 'victoria' } }
   if (sessionTier === 'pausado') return { hex: PPA_HEX.pausar, accion: 'pausar' }
   if (isFlashingInvalid) return { hex: INVALIDO_HEX, pulso: true }
   if (fueraDeLugar) return { hex: BLANCO_HEX, pulso: true }
   if (accionCubo) return { hex: PPA_HEX[accionCubo], accion: accionCubo }
+  // Cuenta regresiva: destello cian por número (EF=6) y verde al «¡Inicia!» (EF=7), como el cubo.
+  if (cuentaTick !== null) return { hex: teamHex, efecto: { n: cuentaTick === 0 ? EFECTOS.CUENTA_INICIA : EFECTOS.CUENTA_TICK, clave: `cuenta-${cuentaTick}` } }
   return { hex: teamHex }
 }

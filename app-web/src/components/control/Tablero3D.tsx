@@ -7,6 +7,7 @@ import {
   type Camara, type CaraRol, type Escena, type RolBandeja, type Vec3,
 } from './proyeccion3d'
 import LeyendaLED from './LeyendaLED'
+import { pasoEfecto, duracionEfecto } from '../../core/ppa/efectosCubo'
 import { Volume2, VolumeX } from 'lucide-react'
 import { playEncaje, sonidoEncajeActivo, fijarSonidoEncaje, suscribirSonidoEncaje } from '../../core/utils/sonidoEncaje'
 import './Tablero3D.css'
@@ -56,6 +57,11 @@ const ELEV_SELECCION = 0.04
 const ARCO = 0.9
 const PROFUNDIDAD_POZO = 0.1
 const ENCAJE_MS = 340
+// Impacto (2026-11-24, sincronía con el sonido): el cubo ya no «se posa» frenando —tardaba ~60 ms en
+// recorrer los últimos 4 px y no había un instante visible de contacto—, sino que cae acelerando, como
+// cuando el imán lo jala, y golpea la base exactamente al terminar la transición. Mover, bajar y
+// reconectar golpean a los ENCAJE_MS; ahí se programa el sonido.
+const CONTACTO_MS = ENCAJE_MS
 
 const ETIQUETA_FASE: Record<PPAPhase, string> = { pausar: 'Pausar', pensar: 'Pensar', actuar: 'Actuar' }
 
@@ -174,6 +180,41 @@ function usePulso(fase: Patron | undefined, t0: number | undefined, id: number):
   return calcularPulso(fase, Math.max(0, t - t0) + id * 377)
 }
 
+/** Efecto EF=<n> del firmware en curso (efectosCubo.ts): color del paso vigente (null = color de
+ *  equipo) y temblor según la vibración de ese paso. null cuando no hay efecto o ya terminó; entonces
+ *  el cubo muestra su estado sostenido, que es el mismo paso final del firmware (p. ej. blanco fijo). */
+function useEfecto(n: number | undefined, t0: number | undefined) {
+  const vivo = n !== undefined && t0 !== undefined && !esReducido() && performance.now() - t0 < duracionEfecto(n) + 60
+  useSyncExternalStore(vivo ? suscribirReloj : sinSuscripcion, leerReloj, leerReloj)
+  if (!vivo) return null
+  const ms = Math.max(0, performance.now() - t0!)
+  const paso = pasoEfecto(n!, ms)
+  if (paso.terminado) return null
+  const amp = paso.vib > 0 ? 0.8 + 1.2 * paso.vib : 0
+  const s = ms / 1000
+  return { hex: paso.hex, dx: amp * Math.sin(2 * Math.PI * 13 * s), dy: 0.6 * amp * Math.sin(2 * Math.PI * 17 * s + 1) }
+}
+
+type InicioEfecto = { n: number; clave: string; t0: number }
+/** Cuándo empezó cada efecto, por cubo. Un efecto que ya estaba al montar el tablero (al cambiar de
+ *  pestaña, por ejemplo) no se repite: el cubo físico tampoco lo repetiría. */
+function useIniciosEfecto(lista: { id: number; n: number; clave: string }[]): Record<number, InicioEfecto> {
+  const clave = lista.map(e => `${e.id}:${e.n}:${e.clave}`).join('|')
+  const [estado, setEstado] = useState<{ clave: string | null; mapa: Record<number, InicioEfecto> }>({ clave: null, mapa: {} })
+  if (estado.clave !== clave) {
+    const primera = estado.clave === null
+    const ahora = performance.now()
+    const mapa: Record<number, InicioEfecto> = {}
+    for (const e of lista) {
+      const previo = estado.mapa[e.id]
+      mapa[e.id] = previo && previo.clave === e.clave && previo.n === e.n ? previo : { n: e.n, clave: e.clave, t0: primera ? -1e9 : ahora }
+    }
+    setEstado({ clave, mapa })
+    return mapa
+  }
+  return estado.mapa
+}
+
 type Inicio = { fase: Patron; t0: number }
 /** Momento en que empezó la señal de cada cubo. Cambia solo cuando aparece, cambia o se retira una
  *  señal, así que las props de los cubos quietos no cambian y su memo los deja sin redibujar. */
@@ -259,8 +300,11 @@ function poroProps(uid: string, opacidad: number) {
 
 /* ---------- Animación: estado 3D interpolado con requestAnimationFrame ---------- */
 
-type Spec = { key: string; target: number; dur: number; entra?: number }
-type Tween = { from: number; to: number; t0: number; dur: number }
+// Curva: 'out' frena al llegar (por omisión); 'lineal' velocidad constante (vuelo horizontal);
+// 'caida' frena al subir y ACELERA al bajar, con tope seco (encaje imantado).
+type Curva = 'out' | 'lineal' | 'caida'
+type Spec = { key: string; target: number; dur: number; entra?: number; curva?: Curva }
+type Tween = { from: number; to: number; t0: number; dur: number; curva: Curva }
 type Estado = {
   prev: Map<string, number>
   tw: Map<string, Tween>
@@ -270,12 +314,14 @@ type Estado = {
 }
 
 const suave = (t: number) => 1 - Math.pow(1 - t, 3) // easeOutCubic
+const curvaDe = (tw: Tween, t: number) =>
+  tw.curva === 'lineal' ? t : tw.curva === 'caida' && tw.to < tw.from ? t * t * t : suave(t)
 
 function paso(e: Estado, fijar: (v: Record<string, number>) => void) {
   const marco = (t: number) => {
     for (const [k, tw] of e.tw) {
       const q = Math.min(1, Math.max(0, (t - tw.t0) / tw.dur))
-      if (q >= 1) { e.tw.delete(k); delete e.cur[k] } else e.cur[k] = tw.from + (tw.to - tw.from) * suave(q)
+      if (q >= 1) { e.tw.delete(k); delete e.cur[k] } else e.cur[k] = tw.from + (tw.to - tw.from) * curvaDe(tw, q)
     }
     fijar({ ...e.cur })
     e.raf = e.tw.size ? requestAnimationFrame(marco) : 0
@@ -308,7 +354,7 @@ function useAnimador(specs: Spec[]) {
         cambio = true
         continue
       }
-      e.tw.set(s.key, { from: desde, to: s.target, t0: ahora, dur: s.dur })
+      e.tw.set(s.key, { from: desde, to: s.target, t0: ahora, dur: s.dur, curva: s.curva ?? 'out' })
       e.cur[s.key] = desde
       cambio = true
     }
@@ -558,6 +604,8 @@ type CuboProps = {
   luz: Luz | null
   fase?: Patron
   t0?: number
+  efN?: number
+  efT0?: number
   E: Escena
 }
 
@@ -599,8 +647,13 @@ const CuboMemo = memo(function CuboMemo({ luzHex, luzPatron, ...props }: Omit<Cu
   return <Cubo {...props} luz={luz} />
 })
 
-function Cubo({ uid, id, X, elev, led, desconectado, buscando, apagado = false, numero, mdf, tono, equipo, luz, fase, t0, E }: CuboProps) {
-  const pulso = usePulso(fase, t0, id)
+function Cubo({ uid, id, X, elev, led: ledBase, desconectado, buscando, apagado = false, numero, mdf, tono, equipo, luz: luzBase, fase, t0, efN, efT0, E }: CuboProps) {
+  const pulsoSenal = usePulso(fase, t0, id)
+  // Efecto del firmware en curso: manda sobre la señal, como en el cubo (EF= reemplaza cualquier estado).
+  const ef = useEfecto(efN, efT0)
+  const luz: Luz | null = ef ? (ef.hex ? { hex: ef.hex, patron: 'fijo' } : null) : luzBase
+  const led = ef ? 1 : ledBase
+  const pulso: Pulso | undefined = ef ? { k: 1, on: ef.dx !== 0, dx: ef.dx, dy: ef.dy } : pulsoSenal
   const { p } = E
   const poly = (v: readonly Vec3[]) => E.pts(v)
   const G = E.girar(X, elev, 0)
@@ -823,11 +876,13 @@ function DecalSinWifi({ E, X, elev, id }: { E: Escena; X: number; elev: number; 
 
 /* ---------- Haz de luz del LED y etiqueta de fase (capa por encima de todos los cubos) ---------- */
 
-const HazSenal = memo(function HazSenal({ uid, id, luzHex, luzPatron, luzEtiqueta, X, cx, cy, led, fase, t0, E }: {
-  uid: string; id: number; luzHex: string; luzPatron: Patron; luzEtiqueta?: string; X: number; cx: number; cy: number; led: number; fase?: Patron; t0?: number; E: Escena
+const HazSenal = memo(function HazSenal({ uid, id, luzHex, luzPatron, luzEtiqueta, X, cx, cy, led, fase, t0, efN, efT0, E }: {
+  uid: string; id: number; luzHex: string; luzPatron: Patron; luzEtiqueta?: string; X: number; cx: number; cy: number; led: number; fase?: Patron; t0?: number; efN?: number; efT0?: number; E: Escena
 }) {
-  const luz: Luz = { hex: luzHex, patron: luzPatron, etiqueta: luzEtiqueta }
-  const pulso = usePulso(fase, t0, id)
+  const pulsoSenal = usePulso(fase, t0, id)
+  const ef = useEfecto(efN, efT0)
+  const luz: Luz = { hex: ef?.hex ?? luzHex, patron: luzPatron, etiqueta: luzEtiqueta }
+  const pulso: Pulso | undefined = ef ? { k: 1, on: ef.dx !== 0, dx: ef.dx, dy: ef.dy } : pulsoSenal
   const { p } = E
   const k = pulso?.k ?? 1
   const hex = luz.hex
@@ -1007,8 +1062,8 @@ export default function Tablero3D({
     const sel = Boolean(c.id) && seleccionado === c.id
     specs.push({ key: `sel:${c.posicion}`, target: sel ? 1 : 0, dur: 180 })
     if (c.id && c.visual) {
-      specs.push({ key: `x:${c.id}`, target: xCasilla(c.posicion + 1), dur: 360 })
-      specs.push({ key: `lift:${c.id}`, target: (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0), dur: c.levantado ? 200 : ENCAJE_MS })
+      specs.push({ key: `x:${c.id}`, target: xCasilla(c.posicion + 1), dur: CONTACTO_MS, curva: 'lineal' })
+      specs.push({ key: `lift:${c.id}`, target: (c.levantado ? ELEV_LEVANTADO : 0) + (sel ? ELEV_SELECCION : 0) + (c.desconectado ? ELEV_FLOTA : 0), dur: c.levantado ? 200 : ENCAJE_MS, curva: 'caida' })
       specs.push({ key: `led:${c.id}`, target: luzDe(c.visual) ? 1 : 0, dur: 220, entra: 0 })
     }
   }
@@ -1032,7 +1087,9 @@ export default function Tablero3D({
       const desde = rec ? (rec.to !== objetivo ? rec.to : rec.from) : objetivo
       const D = Math.abs(objetivo - desde)
       const q = D > 0.01 ? Math.min(1, Math.max(0, 1 - Math.abs(X - objetivo) / D)) : 0
-      const arco = ARCO * Math.sin(Math.PI * q)
+      // Vuelo balístico: sube y cae acelerando (parábola en el tiempo, porque X avanza a velocidad
+      // constante), así que toca la base con un golpe y no posándose.
+      const arco = ARCO * 4 * q * (1 - q)
       return { ...c, sel, X, elev: elev + arco, objetivo, led, luz: luzDe(c.visual!) }
     })
     // Lo lejano primero; el seleccionado y los levantados quedan encima.
@@ -1046,6 +1103,7 @@ export default function Tablero3D({
     }
   })
 
+  const iniciosEf = useIniciosEfecto(cubos.flatMap(c => c.visual?.efecto ? [{ id: c.id, n: c.visual.efecto.n, clave: c.visual.efecto.clave }] : []))
   const inicios = useIniciosSenal(cubos.filter(c => (c.luz && c.luz.patron !== 'fijo') || (!c.luz && c.desconectado)).map(c => ({ id: c.id, fase: c.luz ? c.luz.patron : ('flota' as Patron) })))
 
   // Destello de contacto: al pasar de desconectado a conectado, cuando el cubo termina de bajar.
@@ -1068,9 +1126,9 @@ export default function Tablero3D({
   // casilla, al bajarlo después de levantarlo o al reconectarse. Un cambio masivo (nivel nuevo,
   // reinicio) no suena, y varios cubos a la vez suenan como uno solo.
   const encajes = useRef(new Map<number, { pos: number; lev: boolean; desc: boolean }>())
-  const temporizadores = useRef<number[]>([])
-  // Corre en cada render a propósito: compara cada cubo con el render anterior.
-  useEffect(() => {
+  // Corre en cada render a propósito (en la misma fase que arranca la animación, para medir el golpe
+  // desde el mismo instante): compara cada cubo con el render anterior.
+  useLayoutEffect(() => {
     const previo = encajes.current
     const primera = previo.size === 0
     let movidos = 0
@@ -1081,14 +1139,15 @@ export default function Tablero3D({
       siguiente.set(c.id, ahora)
       const antes = previo.get(c.id)
       if (!antes || ahora.lev || ahora.desc) continue
-      if (antes.pos !== ahora.pos) { movidos++; espera = Math.max(espera, 330) }
-      else if (antes.lev || antes.desc) espera = Math.max(espera, ENCAJE_MS - 60)
+      if (antes.pos !== ahora.pos) { movidos++; espera = CONTACTO_MS }
+      else if (antes.desc || antes.lev) espera = CONTACTO_MS
     }
     encajes.current = siguiente
     if (primera || espera < 0 || movidos > 3) return
-    temporizadores.current.push(window.setTimeout(playEncaje, espera))
+    // El golpe se ve un refresco después del cuadro en que la transición llega a 1 (≈ 16 ms); +8 ms centra
+    // el pico de la onda (5 ms tras su arranque) sobre ese cuadro. Medido: desfase ≈ 0 ± 5 ms.
+    playEncaje(window.matchMedia(REDUCIDO).matches ? 0 : espera + 24)
   })
-  useEffect(() => () => { for (const id of temporizadores.current) window.clearTimeout(id) }, [])
   useEffect(() => {
     if (!hayDestello) return
     let raf = 0
@@ -1170,6 +1229,8 @@ export default function Tablero3D({
                 luzPatron={c.luz?.patron}
                 fase={inicios[c.id]?.fase}
                 t0={inicios[c.id]?.t0}
+                efN={iniciosEf[c.id]?.n}
+                efT0={iniciosEf[c.id]?.t0}
                 E={E}
               />
             ))}
@@ -1189,6 +1250,8 @@ export default function Tablero3D({
                   led={c.led}
                   fase={inicios[c.id]?.fase}
                   t0={inicios[c.id]?.t0}
+                  efN={iniciosEf[c.id]?.n}
+                  efT0={iniciosEf[c.id]?.t0}
                   E={E}
                 />
               )

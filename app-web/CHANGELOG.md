@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 <!-- tabla-versiones:inicio -->
 | Versión | Fecha | Hito | Qué cambió |
 |---|---|---|---|
+| **0.14.2** | 2026-11-24 | Lo físico y lo virtual sincronizados | La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base. |
 | **0.14.1** | 2026-11-24 | Juego fluido en cualquier equipo y sonido de encaje | El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón. |
 | **0.14.0** | 2026-11-23 | Tablero 3D realista y órdenes con confirmación | Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían. |
 | **0.13.0** | 2026-11-23 | Enlace confiable con el maestro y pausa técnica | El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una. |
@@ -39,6 +40,12 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, el 2026-11-20, a partir de
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.2 · 2026-11-24 · lo físico y lo virtual sincronizados
+
+- **Corrección: efectos de fin de intento.** Al perder, Control saltaba directo a blanco y las simulaciones no mostraban nada. Ahora la pantalla reproduce paso a paso los efectos del firmware (`EF=4` bloqueo: rojo con vibración decreciente → blanco fijo; `EF=5` victoria: verde/dorado → blanco fijo; `EF=6/7` cuenta regresiva: destello cian / verde) con el mismo color, vibración y duración que el cubo (`src/core/ppa/efectosCubo.ts`).
+- **Auditoría `efectos:verificar`:** lee las tablas `EFECTO_<n>_*` de `Cubo_Esclavo_v3.ino` y las compara con las de la pantalla; forma parte de la verificación de cada publicación.
+- **Corrección: sonido de encaje tardío.** El cubo frenaba al llegar y no había un instante de contacto. Ahora cae acelerando (encaje imantado) y el vuelo entre casillas es balístico; el golpe ocurre a los 340 ms exactos y el sonido se programa en el reloj de audio para ese instante con la latencia de salida del navegador (`getOutputTimestamp`). Medido: el golpe de madera suena a ±5 ms del cuadro del impacto.
 
 ## 0.14.1 · 2026-11-24 · juego fluido en cualquier equipo y sonido de encaje
 

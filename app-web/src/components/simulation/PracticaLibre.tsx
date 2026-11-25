@@ -5,7 +5,7 @@ import {
 import { classifyAttempt, explainError, successText } from '../../core/simulation/tutor'
 import { type BitacoraEvent, type PPAPhase, nowIso, toCsv, downloadFile } from '../../core/simulation/bitacora'
 import { playPpaFeedback, playError, playCountdownBeep } from '../../core/utils/ppaTones'
-import { PPA_HEX, PPA_TEXT, PPA_LABEL, AUTO_OFF_MS, ppaRgba } from '../../core/ppa/ppaColors'
+import { PPA_HEX, PPA_TEXT, PPA_LABEL, AUTO_OFF_MS, ppaRgba, EFECTOS } from '../../core/ppa/ppaColors'
 import { usePpaMotor, type EventoPpa } from '../../core/ppa/usePpaMotor'
 import PanelMediacion from '../ppa/PanelMediacion'
 import { Panel, SectionTitle, Collapsible, LogPanel, SignalGlyph } from '../../ui/brand'
@@ -319,7 +319,11 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
         <SimBoard permitir3d
           board={board} prev={prevBoard} disabled={session !== 'jugando'}
           selected={selected} onSelect={i => { setSelected(i); setErrorCell(null) }}
-          onMove={handleMove} onInvalid={handleInvalid} errorCell={errorCell} cubeActions={cubeActions} />
+          onMove={handleMove} onInvalid={handleInvalid} errorCell={errorCell} cubeActions={cubeActions}
+          efectoSesion={session === 'victoria' ? { n: EFECTOS.VICTORIA, clave: `v${intentoRef.current}` }
+            : session === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${intentoRef.current}` }
+              : countdown !== null && (session === 'cuenta' || (session === 'jugando' && countdown === 0)) ? { n: countdown === 0 ? EFECTOS.CUENTA_INICIA : EFECTOS.CUENTA_TICK, clave: `c${intentoRef.current}-${countdown}` }
+                : null} />
         {/* Jugada rechazada: se dice qué regla se rompió y se anima, igual que
             en el tutorial. Antes solo aparecía una línea fina bajo el tablero. */}
         {fallo && session === 'jugando' ? (
