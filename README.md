@@ -2,7 +2,7 @@
 
 Herramienta híbrida físico-virtual del juego **La Escalera** (salto de la rana): un tablero de cubos inteligentes (ESP32) y una aplicación web. Las dos comparten el mismo motor de reglas, el grafo del espacio del problema en vivo, las métricas de trayectoria y un protocolo de mediación Pausar–Pensar–Actuar bajo control Mago de Oz.
 
-**Versión actual: 0.14.5** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
+**Versión actual: 0.14.6** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
 
 **Pruébala en el navegador, sin instalar nada:** https://profenapaipa.github.io/NestorTesisMET_Escalera_inteligente/
 
@@ -50,6 +50,7 @@ El software se ha desarrollado y mejorado por etapas. Cada informe, sesión y pa
 <!-- tabla-versiones:inicio -->
 | Versión | Hito | Qué cambió |
 |---|---|---|
+| **0.14.6** | Control Mago de Oz agrupa sus tres vistas | La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes. |
 | **0.14.5** | Avisos breves arriba y versiones sin fechas | El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza. |
 | **0.14.4** | Cuenta regresiva semáforo y mediación en el tablero | La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida. |
 | **0.14.3** | Animación ágil y mediación en un solo panel | Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos. |

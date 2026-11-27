@@ -29,6 +29,15 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.6', publica: true,
+    titulo: 'Control Mago de Oz agrupa sus tres vistas',
+    cambios: 'La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes.',
+    detalle: [
+      m('La pestaña «1 · Control Mago de Oz» despliega un menú con las tres vistas de una sesión con el tablero físico: Control, Vista del jugador y Vista de observador. Si se está en Jugador u Observador, la pestaña lo indica.'),
+      m('Las demás pestañas se renumeran: 2 · Tutorial, 3 · Simulación y 4 · Informes.'),
+    ],
+  },
+  {
     version: '0.14.5', publica: true,
     titulo: 'Avisos breves arriba y versiones sin fechas',
     cambios: 'El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza.',

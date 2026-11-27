@@ -121,7 +121,7 @@ export default function PantallaInicio({ onAbrir }: { onAbrir: (participante: st
             Todavía no hay perfiles guardados aquí. Si ya jugaste antes y no aparecen, comprueba que estés abriendo la
             aplicación en la misma dirección de siempre: el historial se guarda por navegador <b>y por dirección</b>{' '}
             (no es lo mismo <span style={{ fontFamily: 'var(--font-mono)' }}>localhost:5173</span> que otro puerto).
-            También puedes recuperar una sesión antigua desde «5 · Informes → Importar bitácoras» con su archivo .json.
+            También puedes recuperar una sesión antigua desde «4 · Informes → Importar bitácoras» con su archivo .json.
           </div>
         )}
 

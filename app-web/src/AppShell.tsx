@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import App, { type ControlSnapshot } from './App'
 import PantallaInicio from './components/PantallaInicio'
 import InformeGeneral from './components/informe/InformeGeneral'
@@ -14,6 +14,7 @@ import ObservadorTab from './components/ObservadorTab'
 import InformesTab from './components/InformesTab'
 import VistaJugador from './components/jugador/VistaJugador'
 import { StepMark, WIDE_MAX } from './ui/brand'
+import { ChevronDown } from 'lucide-react'
 
 type Tab = 'control' | 'jugador' | 'tutorial' | 'libre' | 'observador' | 'informes'
 
@@ -22,9 +23,20 @@ const TABS: { id: Tab; label: string; short: string; mode: string; modeColor: st
   { id: 'jugador', label: 'Vista del jugador', short: 'Jugador', mode: 'Pantalla del participante', modeColor: 'var(--color-online)' },
   { id: 'tutorial', label: '2 · Tutorial guiado', short: '2 · Tutorial', mode: 'Sin hardware — aprendizaje', modeColor: 'var(--color-blue)' },
   { id: 'libre', label: '3 · Simulación libre', short: '3 · Simulación', mode: 'Sin hardware — práctica', modeColor: 'var(--color-blue)' },
-  { id: 'observador', label: '4 · Vista de observador', short: '4 · Observador', mode: 'Solo lectura', modeColor: 'var(--color-paper-dim)' },
-  { id: 'informes', label: '5 · Informes', short: '5 · Informes', mode: 'Sesiones guardadas', modeColor: 'var(--color-blue)' },
+  { id: 'observador', label: 'Vista de observador', short: 'Observador', mode: 'Solo lectura', modeColor: 'var(--color-paper-dim)' },
+  { id: 'informes', label: '4 · Informes', short: '4 · Informes', mode: 'Sesiones guardadas', modeColor: 'var(--color-blue)' },
 ]
+
+// Pestaña «1 · Control Mago de Oz» (pedido del autor, 2026-11-27): agrupa las
+// tres vistas de una sesión con el tablero físico, que se despliegan desde ella.
+const GRUPO_CONTROL: { id: Tab; nombre: string; detalle: string }[] = [
+  { id: 'control', nombre: 'Control Mago de Oz', detalle: 'La consola del operador' },
+  { id: 'jugador', nombre: 'Vista del jugador', detalle: 'La pantalla del participante' },
+  { id: 'observador', nombre: 'Vista de observador', detalle: 'Espejo de Control, solo lectura' },
+]
+const EN_GRUPO = new Set<Tab>(GRUPO_CONTROL.map(g => g.id))
+// Pestañas de primer nivel: el grupo y las demás vistas.
+const PRIMER_NIVEL: (Tab | 'grupo')[] = ['grupo', 'tutorial', 'libre', 'informes']
 
 function Shell() {
   const { perfil, abrirSesion, cerrarSesion } = useSesion()
@@ -49,6 +61,38 @@ function Shell() {
   const noop = () => { /* el perfil se fija al abrir la sesión */ }
 
   const current = TABS.find(t => t.id === tab)!
+  // Menú desplegable del grupo Control. Va en posición fija porque la barra
+  // de pestañas se desplaza a lo ancho y recortaría un menú absoluto.
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const botonGrupo = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menu) return
+    const fuera = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !botonGrupo.current?.contains(e.target as Node)) setMenu(null)
+    }
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenu(null); botonGrupo.current?.focus() } }
+    const cerrar = () => setMenu(null)
+    window.addEventListener('pointerdown', fuera)
+    window.addEventListener('keydown', tecla)
+    window.addEventListener('resize', cerrar)
+    return () => { window.removeEventListener('pointerdown', fuera); window.removeEventListener('keydown', tecla); window.removeEventListener('resize', cerrar) }
+  }, [menu])
+  useEffect(() => { if (menu) menuRef.current?.querySelector<HTMLButtonElement>('[aria-current="page"], button')?.focus() }, [menu])
+  const abrirMenu = () => {
+    const r = botonGrupo.current?.getBoundingClientRect()
+    if (!r) return
+    setMenu(m => m ? null : { x: Math.max(8, Math.min(r.left, window.innerWidth - 268)), y: r.bottom + 4 })
+  }
+  const estiloPestana = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 14px 10px',
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    borderBottom: `2px solid ${active ? 'var(--color-blue)' : 'transparent'}`,
+    color: active ? 'var(--color-paper)' : 'var(--color-paper-faint)',
+    fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
+    letterSpacing: '0.08em', textTransform: 'uppercase',
+  })
+  const subActual = GRUPO_CONTROL.find(g => g.id === tab)
 
   if (!perfil) return <PantallaInicio key={semilla} onAbrir={abrirSesion} />
 
@@ -73,17 +117,28 @@ function Shell() {
         <nav aria-label="Vistas de la aplicación" className="barra-pestanas" style={{
           display: 'flex', alignItems: 'stretch', gap: '4px', flex: 1, minWidth: 0,
         }}>
-          {TABS.map(t => {
+          {PRIMER_NIVEL.map(id => {
+            if (id === 'grupo') {
+              const active = EN_GRUPO.has(tab)
+              return (
+                <button key="grupo" ref={botonGrupo} className="pestana" aria-label="1 · Control Mago de Oz: Control, Vista del jugador y Vista de observador"
+                  aria-haspopup="true" aria-expanded={!!menu} aria-current={active ? 'page' : undefined}
+                  onClick={e => { e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); abrirMenu() }}
+                  style={estiloPestana(active)}>
+                  <StepMark color={active ? 'var(--color-blue)' : 'var(--color-line-strong)'} size={11} />
+                  <span className="pestana__larga">1 · Control Mago de Oz</span>
+                  <span className="pestana__corta" aria-hidden="true">1 · Control</span>
+                  {active && subActual && subActual.id !== 'control' && (
+                    <span aria-hidden="true" style={{ color: 'var(--color-blue)', letterSpacing: '0.04em' }}>· {subActual.id === 'jugador' ? 'Jugador' : 'Observador'}</span>
+                  )}
+                  <ChevronDown size={12} aria-hidden style={{ transform: menu ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                </button>
+              )
+            }
+            const t = TABS.find(x => x.id === id)!
             const active = t.id === tab
             return (
-              <button key={t.id} className="pestana" aria-label={t.label} aria-current={active ? 'page' : undefined} onClick={e => { setTab(t.id); e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }) }} style={{
-                display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 14px 10px',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                borderBottom: `2px solid ${active ? 'var(--color-blue)' : 'transparent'}`,
-                color: active ? 'var(--color-paper)' : 'var(--color-paper-faint)',
-                fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600,
-                letterSpacing: '0.08em', textTransform: 'uppercase',
-              }}>
+              <button key={t.id} className="pestana" aria-label={t.label} aria-current={active ? 'page' : undefined} onClick={e => { setTab(t.id); setMenu(null); e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }) }} style={estiloPestana(active)}>
                 <StepMark color={active ? 'var(--color-blue)' : 'var(--color-line-strong)'} size={11} />
                 <span className="pestana__larga">{t.label}</span>
                 <span className="pestana__corta" aria-hidden="true">{t.short}</span>
@@ -145,6 +200,32 @@ function Shell() {
       <div style={{ display: tab === 'informes' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <InformesTab activo={tab === 'informes'} />
       </div>
+
+      {/* Menú del grupo «1 · Control Mago de Oz». */}
+      {menu && (
+        <div ref={menuRef} role="group" aria-label="Vistas de Control Mago de Oz" className="menu-grupo-control" style={{
+          position: 'fixed', left: menu.x, top: menu.y, zIndex: 70, width: '260px',
+          background: 'var(--color-panel)', border: '1px solid var(--color-line-strong)', borderRadius: 'var(--radius)',
+          boxShadow: '0 12px 28px rgba(0,0,0,.35)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '2px',
+        }}>
+          {GRUPO_CONTROL.map(g => {
+            const activo = g.id === tab
+            return (
+              <button key={g.id} type="button" aria-current={activo ? 'page' : undefined}
+                onClick={() => { setTab(g.id); setMenu(null); botonGrupo.current?.focus() }}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', textAlign: 'left',
+                  minHeight: '44px', padding: '8px 10px', borderRadius: 'var(--radius)', cursor: 'pointer',
+                  background: activo ? 'color-mix(in srgb, var(--color-blue) 14%, transparent)' : 'transparent',
+                  border: `1px solid ${activo ? 'var(--color-blue)' : 'transparent'}`, color: 'var(--color-paper)',
+                }}>
+                <span style={{ fontSize: '13px', fontWeight: 700 }}>{g.nombre}</span>
+                <span style={{ fontSize: '11px', color: 'var(--color-paper-dim)' }}>{g.detalle}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {creditos && <Creditos onCerrar={() => setCreditos(false)} />}
       {limitaciones && <Limitaciones onCerrar={() => setLimitaciones(false)} />}
