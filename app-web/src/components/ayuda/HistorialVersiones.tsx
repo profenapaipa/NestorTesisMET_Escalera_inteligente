@@ -44,7 +44,7 @@ export default function HistorialVersiones() {
   return (
     <div>
       <p style={{ fontSize: '12.5px', lineHeight: 1.55, margin: '0 0 10px', color: 'var(--color-paper-dim)' }}>
-        {HISTORIAL_VERSIONES.length} versiones desde septiembre de 2026: {plural(totales.correccion, 'correccion')},{' '}
+        {HISTORIAL_VERSIONES.length} versiones: {plural(totales.correccion, 'correccion')},{' '}
         {plural(totales.mejora, 'mejora')} y {plural(totales.novedad, 'novedad')}. Despliega una versión para ver qué
         error se corrigió y qué cambió. El historial público empieza en la 0.11.0; las anteriores se hicieron en el
         repositorio privado de la tesis.

@@ -6,6 +6,7 @@ import type { ControlSnapshot } from '../App'
 import { PageFrame, Panel, PersonField, Badge, SectionTitle, Collapsible, LogPanel, TwoColumn, Electrode, PuntoConexion } from '../ui/brand'
 import { sectionLabel, sessionBtn, TEAM_HEX } from '../ui/styles'
 import GrafoEstados from './simulation/GrafoEstados'
+import AvisoRegla from './simulation/AvisoRegla'
 import InformeNivel from './informe/InformeNivel'
 import { BotonInformeNivel } from './informe/botones'
 import { useSesion } from '../core/session/sesion'
@@ -125,6 +126,8 @@ function ObservadorTab({ snapshot, operatorId }: { snapshot: ControlSnapshot | n
         }>
           Tablero en vivo · {snapshot ? `${snapshot.board.length} posiciones · esclavos ${snapshot.esclavos.length}/10` : 'sin datos'}
         </SectionTitle>
+        {/* La misma línea de regla rota que ve el operador en Control, arriba de los cubos. */}
+        {snapshot && <AvisoRegla fallo={snapshot.fallo ?? null} reservar={snapshot.status === 'en curso'} />}
         {snapshot ? (
           <div ref={ajusteTablero.ref}>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap', justifyContent: 'center', zoom: ajusteTablero.escala }}>

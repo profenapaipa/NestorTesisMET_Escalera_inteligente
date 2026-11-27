@@ -301,6 +301,12 @@ html, body { max-width: 100%; overflow-x: hidden; }
   outline-offset: 2px;
 }
 .panel-mediacion button { min-height: 44px; }
+/* Botones tenues de la franja de mediación: al pasar o pulsar se aviva el color de su fase. */
+.ppa-boton, .mediacion-reposo { transition: background-color .15s ease, border-color .15s ease, transform .08s ease; }
+.ppa-boton:hover { background: color-mix(in srgb, var(--ppa) 16%, transparent) !important; border-color: color-mix(in srgb, var(--ppa) 60%, transparent) !important; }
+.ppa-boton:active, .mediacion-reposo:active { transform: scale(.97); }
+.mediacion-banda .mediacion-reposo:hover { background: color-mix(in srgb, var(--color-paper) 10%, transparent) !important; }
+@media (prefers-reduced-motion: reduce) { .ppa-boton, .mediacion-reposo { transition: none; } }
 @media (max-width: 520px) {
   .panel-mediacion input[type="range"] { width: 100% !important; }
 }

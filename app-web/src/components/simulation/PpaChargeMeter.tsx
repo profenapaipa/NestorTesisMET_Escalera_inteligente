@@ -10,7 +10,7 @@ const ESTILO_LATIDO = `
 @media (prefers-reduced-motion: reduce) { .ppa-anillo-lleno { animation: none } }
 `
 
-function PpaChargeMeter({ value, max, colorHex, label, texto, lleno, onClick, titulo, size = 46 }: {
+function PpaChargeMeter({ value, max, colorHex, label, texto, lleno, onClick, titulo, size = 46, boton = false }: {
   value: number
   max: number
   colorHex: string
@@ -22,6 +22,8 @@ function PpaChargeMeter({ value, max, colorHex, label, texto, lleno, onClick, ti
   onClick?: () => void
   titulo?: string
   size?: number
+  // Aspecto de botón tenue (franja de mediación): fondo y borde del color de la fase, muy suaves.
+  boton?: boolean
 }) {
   const pct = Math.max(0, Math.min(max > 0 ? value / max : 0, 1))
   const stroke = 5, r = (size - stroke) / 2, c = 2 * Math.PI * r
@@ -40,7 +42,7 @@ function PpaChargeMeter({ value, max, colorHex, label, texto, lleno, onClick, ti
           {texto ?? `${value}/${max}`}
         </text>
       </svg>
-      <div style={{ fontSize: '11px', color: lleno ? colorHex : '#999', fontWeight: lleno ? 700 : 400, lineHeight: 1.25, textAlign: 'left' }}>{label}</div>
+      <div style={{ fontSize: '11px', color: lleno ? colorHex : boton ? 'var(--color-paper)' : '#999', fontWeight: lleno ? 700 : 400, lineHeight: 1.25, textAlign: 'left' }}>{label}</div>
     </>
   )
   return (
@@ -48,7 +50,15 @@ function PpaChargeMeter({ value, max, colorHex, label, texto, lleno, onClick, ti
       <style>{ESTILO_LATIDO}</style>
       {onClick ? (
         <button type="button" onClick={onClick} title={titulo} aria-label={titulo}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}>
+          className={boton ? 'ppa-boton' : undefined}
+          style={boton
+            ? {
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 14px 5px 6px', cursor: 'pointer', color: 'inherit',
+                borderRadius: '14px', ['--ppa' as string]: colorHex,
+                background: `color-mix(in srgb, ${colorHex} ${lleno ? 18 : 8}%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${colorHex} ${lleno ? 70 : 32}%, transparent)`,
+              }
+            : { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}>
           {contenido}
         </button>
       ) : (

@@ -6,8 +6,8 @@
 //
 // El historial PÚBLICO (repositorio NestorTesisMET_Escalera_inteligente)
 // empieza en 0.11.0. Las versiones anteriores se desarrollaron en el
-// repositorio privado de la tesis y se numeraron el 2026-11-20 a partir de los
-// hitos de su historial de commits.
+// repositorio privado de la tesis y se numeraron después a partir de los hitos
+// de su historial de commits. Sin fechas: el historial dice qué cambió, no cuándo.
 
 // novedad: algo que antes no existía · mejora: algo que ya existía y ahora
 // funciona o se ve mejor · correccion: un error que se arregló (qué fallaba).
@@ -17,7 +17,6 @@ export type Cambio = { tipo: TipoCambio; texto: string }
 
 export type Version = {
   version: string
-  fecha: string // AAAA-MM-DD
   titulo: string
   cambios: string // resumen de una línea (tabla del CHANGELOG)
   detalle: Cambio[]
@@ -30,7 +29,19 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
-    version: '0.14.4', fecha: '2026-11-25', publica: true,
+    version: '0.14.5', publica: true,
+    titulo: 'Avisos breves arriba y versiones sin fechas',
+    cambios: 'El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza.',
+    detalle: [
+      m('El aviso de una jugada no permitida es una sola línea ARRIBA de los cubos («✕ Regla N · qué pasó: la regla en pocas palabras»), en un espacio reservado: ya no baja de la pantalla ni mueve el tablero o la mediación. La animación de la regla se abre encima solo con «Ver regla».'),
+      n('La Vista de observador también muestra qué regla se incumplió en el tablero físico, con la misma línea que ve el operador.'),
+      m('Mediación centrada bajo los cubos: Pausar, Pensar y Actuar como botones tenues de su color y «Volver a estado inicial» al lado; el cubo seleccionado, la ayuda y el umbral de Actuar debajo, en letra pequeña.'),
+      m('El historial de versiones ya no muestra fechas: dice qué cambió en cada una, no cuándo.'),
+      n('Aviso de versión nueva: al abrir una versión distinta de la última vista en ese navegador aparece «Se actualizó a la versión…» con el botón «Revísalo», que abre este historial.'),
+    ],
+  },
+  {
+    version: '0.14.4', publica: true,
     titulo: 'Cuenta regresiva semáforo y mediación en el tablero',
     cambios: 'La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida.',
     detalle: [
@@ -41,7 +52,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.14.3', fecha: '2026-11-25', publica: true,
+    version: '0.14.3', publica: true,
     titulo: 'Animación ágil y mediación en un solo panel',
     cambios: 'Los cubos se mueven más rápido y fluidos (cada cubo se anima por su cuenta, sin redibujar el tablero entero) y la mediación y el control de cubos quedan en un solo panel bajo el tablero, sin botones repetidos.',
     detalle: [
@@ -52,7 +63,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.14.2', fecha: '2026-11-24', publica: true,
+    version: '0.14.2', publica: true,
     titulo: 'Lo físico y lo virtual sincronizados',
     cambios: 'La pantalla reproduce paso a paso los efectos del firmware (bloqueo, victoria, cuenta regresiva) y el sonido de encaje suena en el mismo instante en que el cubo golpea la base.',
     detalle: [
@@ -63,7 +74,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.14.1', fecha: '2026-11-24', publica: true,
+    version: '0.14.1', publica: true,
     titulo: 'Juego fluido en cualquier equipo y sonido de encaje',
     cambios: 'El grafo sigue al jugador centrado y con zoom sin volver a dibujarse en cada jugada; el tablero 3D dibuja cada cubo por separado y comparte sus efectos; sonido suave de encaje (madera e imán) que se puede apagar con un botón.',
     detalle: [
@@ -74,7 +85,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.14.0', fecha: '2026-11-23', publica: true,
+    version: '0.14.0', publica: true,
     titulo: 'Tablero 3D realista y órdenes con confirmación',
     cambios: 'Vista 3D del tablero (MDF por defecto, también Minimalista) con cámara central y luz realista, en Control y en las simulaciones; señales PPA, error y desconexión animados como el cubo real; las órdenes al maestro ya no se pierden: se confirman y se reenvían.',
     detalle: [
@@ -88,7 +99,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.13.0', fecha: '2026-11-23', publica: true,
+    version: '0.13.0', publica: true,
     titulo: 'Enlace confiable con el maestro y pausa técnica',
     cambios: 'El servidor y la pantalla reconocen envíos repetidos o perdidos del maestro y avisan si se reinició; pausa técnica separada de Pausar; la vista del jugador ya no muestra diagnóstico; historial de versiones con el detalle de cada una.',
     detalle: [
@@ -103,7 +114,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.12.3', fecha: '2026-11-21', publica: true,
+    version: '0.12.3', publica: true,
     titulo: 'El juego al centro de la atención',
     cambios: 'Simulación libre y Tutorial guiado: el tablero ocupa el 60 % del ancho y el grafo el 40 % (antes el grafo se llevaba más de la mitad). Vista de observador: tablero, registro de observaciones y grafo, en ese orden, con el cronómetro centrado.',
     detalle: [
@@ -113,7 +124,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.12.2', fecha: '2026-11-21', publica: true,
+    version: '0.12.2', publica: true,
     titulo: 'Logo oficial en la pestaña del navegador',
     cambios: 'La pestaña del navegador muestra la marca de Escalera Inteligente (escalera azul y roja) en lugar del ícono genérico de la herramienta de compilación, que además no cargaba en GitHub Pages; ícono para iPhone/iPad y color de la barra del navegador en el celular.',
     detalle: [
@@ -123,7 +134,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.12.1', fecha: '2026-11-21', publica: true,
+    version: '0.12.1', publica: true,
     titulo: 'Textos sin montarse en celular y computador',
     cambios: 'Barra superior en dos carriles: las pestañas no se parten en dos líneas y las acciones (versión, Terminar sesión, perfil) siempre se ven; nombres cortos de pestaña cuando no caben; en el celular, «Cómo usar esta vista» empieza cerrada, las tarjetas de nivel del tutorial y las de Pausar/Pensar/Actuar ya no se exprimen y los títulos de sección bajan de línea en vez de partirse.',
     detalle: [
@@ -135,7 +146,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.12.0', fecha: '2026-11-21', publica: true,
+    version: '0.12.0', publica: true,
     titulo: 'Accesibilidad',
     cambios: 'Página en español para lectores de pantalla; más contraste en textos secundarios y bordes; conexión de cada cubo con símbolo además del color; respeto de «reducir movimiento»; controles de 44 px en pantallas táctiles; pestañas como navegación con nombre; avisos del tutorial anunciados.',
     detalle: [
@@ -148,7 +159,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.11.0', fecha: '2026-11-21', publica: true,
+    version: '0.11.0', publica: true,
     titulo: 'Primera versión pública con historial propio',
     cambios: 'Colores de los grafos auditados para daltonismo y contraste; leyenda y «cómo leerlo» en cada grafo; correcciones de una auditoría independiente (análisis de la mediación, motor PPA, importación, exportación).',
     detalle: [
@@ -163,7 +174,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.10.0', fecha: '2026-11-20', publica: false,
+    version: '0.10.0', publica: false,
     titulo: 'Celulares, ayuda integrada y grafos para publicar',
     cambios: 'Interfaz adaptada a celulares; limitaciones conocidas y guía rápida en la app; paleta académica; figura HD de cada grafo con leyenda y créditos.',
     detalle: [
@@ -175,7 +186,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.9.0', fecha: '2026-11-20', publica: false,
+    version: '0.9.0', publica: false,
     titulo: 'Versionado y trazabilidad',
     cambios: 'Versión y commit en cada informe, sesión y paquete; fechas al segundo con zona horaria; HTML interactivo con rutas mínimas; perfiles simulados descriptivos.',
     detalle: [
@@ -187,7 +198,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.8.0', fecha: '2026-11-20', publica: false,
+    version: '0.8.0', publica: false,
     titulo: 'Repositorio público y protección de datos',
     cambios: 'Software publicado aparte; ejemplos sintéticos; credenciales fuera del código; un motor de mediación para las tres vistas; paquete de datos seudonimizado; marcadores EEG.',
     detalle: [
@@ -198,7 +209,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.7.0', fecha: '2026-10-22', publica: false,
+    version: '0.7.0', publica: false,
     titulo: 'Métricas, mediación y cubos v3',
     cambios: 'Agregación ponderada y eficiencia; tiempos de planificación; efecto de la mediación en los informes; firmware v3 tras la prueba de banco; respaldo durable.',
     detalle: [
@@ -209,7 +220,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.6.0', fecha: '2026-10-17', publica: false,
+    version: '0.6.0', publica: false,
     titulo: 'Tablero físico en vivo',
     cambios: 'Estado real del tablero, vista del jugador, telemetría de los cubos y sincronización con el EEG.',
     detalle: [
@@ -219,7 +230,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.5.0', fecha: '2026-10-08', publica: false,
+    version: '0.5.0', publica: false,
     titulo: 'Informes y perfiles',
     cambios: 'Informes en dos niveles, perfiles con historial, publicación en GitHub Pages; las métricas consideran que la solución mínima no es única.',
     detalle: [
@@ -229,7 +240,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.4.0', fecha: '2026-10-02', publica: false,
+    version: '0.4.0', publica: false,
     titulo: 'Reglas oficiales y grafo de estados',
     cambios: 'Reglas del juego según el libro (Fig. 3.3) y grafo del espacio del problema en vivo.',
     detalle: [
@@ -238,7 +249,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.3.0', fecha: '2026-09-25', publica: false,
+    version: '0.3.0', publica: false,
     titulo: 'Tutorial y simulación',
     cambios: 'Tutorial guiado con motor pedagógico, Simulación libre y Vista de observador.',
     detalle: [
@@ -247,7 +258,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.2.0', fecha: '2026-09-18', publica: false,
+    version: '0.2.0', publica: false,
     titulo: 'Consola de operación',
     cambios: 'Menor latencia entre maestro y cubos, control de partida con código de colores e identidad visual.',
     detalle: [
@@ -257,7 +268,7 @@ export const HISTORIAL_VERSIONES: Version[] = [
     ],
   },
   {
-    version: '0.1.0', fecha: '2026-09-01', publica: false,
+    version: '0.1.0', publica: false,
     titulo: 'Estructura propia sobre ACACIA',
     cambios: 'Pestañas de Control, Simulación y Observador, controlador simulado y bitácoras, sobre la línea base del proyecto ACACIA (módulo INNOVA).',
     detalle: [

@@ -38,7 +38,7 @@ import { usePpaMotor, type EventoPpa } from './core/ppa/usePpaMotor'
 import { CONFIG_PPA } from './core/ppa/motorPpa'
 import GrafoEstados from './components/simulation/GrafoEstados'
 import EndBanner from './components/simulation/EndBanner'
-import { AnimacionRegla } from './components/simulation/RulesAnimation'
+import AvisoRegla, { type FalloRegla } from './components/simulation/AvisoRegla'
 import InformeNivel from './components/informe/InformeNivel'
 import { BotonInformeNivel } from './components/informe/botones'
 import { Electrode, StepMark, PageFrame, PersonField, ParesPicker, Collapsible, Badge, LogPanel, SectionTitle } from './ui/brand'
@@ -69,6 +69,8 @@ export type ControlSnapshot = {
   // Recorrido del intento sobre el grafo de estados, para que el observador
   // vea el mismo mapa que el operador sin tocar el socket.
   recorrido: number[]
+  // Última jugada rechazada del tablero físico (la misma línea que ve el operador).
+  fallo: FalloRegla | null
 }
 
 function App({ onSnapshot, operatorId, setOperatorId }: {
@@ -139,7 +141,7 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
   // Qué regla infringió la última jugada rechazada del tablero físico: el
   // hardware solo dice que algo cambió, así que se clasifica aquí con las
   // mismas reglas del libro que usan el tutorial y la simulación.
-  const [fallo, setFallo] = useState<{ error: string; titulo: string; texto: string } | null>(null)
+  const [fallo, setFallo] = useState<FalloRegla | null>(null)
   const [informeNivel, setInformeNivel] = useState(false)
   const [cuboEvents,     setCuboEvents]     = useState<EventoCubo[]>([])
   const [operatorEvents, setOperatorEvents] = useState<DecisionOperador[]>([])
@@ -1336,10 +1338,10 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
     onSnapshot?.({
       board: visibleCubes.map(c => c.id), cubeActions, connected: isBaseConnected, esclavos,
       status: sessionStatusLabel, elapsed: sessionElapsedLabel, intento: intentoCount, moveCount, pares,
-      recorrido,
+      recorrido, fallo,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardIds, cubeActions, isBaseConnected, esclavos, sessionStatusLabel, sessionElapsedLabel, intentoCount, moveCount, pares, recorrido])
+  }, [boardIds, cubeActions, isBaseConnected, esclavos, sessionStatusLabel, sessionElapsedLabel, intentoCount, moveCount, pares, recorrido, fallo])
 
   // Registra victoria/derrota una sola vez por partida (al pasar de
   // "jugando" a un estado final), no en cada render.
@@ -1852,6 +1854,11 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
             </div>
           </div>
 
+          {/* Jugada rechazada del tablero físico: una línea ARRIBA de los cubos con la regla rota
+              (la animación se abre encima con «Ver regla»). Reserva su alto durante el intento
+              para que el tablero no salte; también se ve en la Vista de observador. */}
+          <AvisoRegla fallo={fallo} onOcultar={() => setFallo(null)} reservar={sessionState === 'jugando'} />
+
           {/* Bajo cada cubo: punto = WiFi del cubo (verde/rojo); barra =
               lo que lee la base en esa casilla (azul = detecta un cubo). */}
           {vistaTablero === '2d' ? (
@@ -1977,31 +1984,6 @@ function App({ onSnapshot, operatorId, setOperatorId }: {
             </div>
           )}
 
-          {/* Jugada rechazada del tablero físico: se dice qué regla se rompió
-              y se anima, igual que en el tutorial y en la simulación libre.
-              Antes solo subía el medidor de fallas, sin explicar nada. */}
-          {fallo && (
-            <div style={{
-              marginTop: '12px', padding: '12px 14px', borderRadius: 'var(--radius)',
-              background: 'rgba(250,77,86,0.10)', border: '2px solid var(--color-offline)',
-              display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap',
-            }}>
-              <span aria-hidden="true" style={{
-                width: '30px', height: '30px', flexShrink: 0, borderRadius: '50%', background: 'var(--color-offline)',
-                color: '#0B0F10', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 800,
-              }}>✕</span>
-              <div style={{ flex: 1, minWidth: '220px' }}>
-                <div style={{ ...sectionLabel, color: 'var(--color-offline)' }}>Movimiento no permitido en el tablero físico</div>
-                <div style={{ fontSize: '17px', fontWeight: 700, margin: '2px 0' }}>{fallo.titulo}</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-paper-dim)', lineHeight: 1.5 }}>{fallo.texto}</div>
-              </div>
-              <div style={{ flex: '1 1 330px', minWidth: '240px', maxWidth: '430px' }}><AnimacionRegla error={fallo.error} /></div>
-              <button onClick={() => setFallo(null)} style={{
-                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                fontSize: '11px', color: 'var(--color-paper-faint)', textDecoration: 'underline',
-              }}>ocultar</button>
-            </div>
-          )}
         </div>
 
 

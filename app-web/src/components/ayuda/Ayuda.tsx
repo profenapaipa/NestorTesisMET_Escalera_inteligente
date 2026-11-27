@@ -1,7 +1,8 @@
 // Ayuda integrada: limitaciones conocidas (fase 1) y guía rápida (fase 2).
 // Los textos viven en core/guia.ts.
 import { useState } from 'react'
-import { ChevronDown, Info } from 'lucide-react'
+import { ChevronDown, Info, Sparkles, X } from 'lucide-react'
+import { HISTORIAL_VERSIONES } from '../../core/versiones'
 import ModalInforme, { Bloque } from '../informe/ModalInforme'
 import { CAMINOS, GUIA_VISTA, LIMITACIONES } from '../../core/guia'
 import { COMMIT_APP, VERSION_APP } from '../../core/version'
@@ -25,6 +26,56 @@ export function DistintivoVersion({ onAbrir }: { onAbrir: () => void }) {
       }}>
       <Info size={11} /> v{VERSION_APP}<span className="distintivo-version__estado"> · en desarrollo</span>
     </button>
+  )
+}
+
+// Aviso «versión nueva» (pedido del autor, 2026-11-25): la primera vez que el
+// navegador abre una versión distinta de la última que vio, aparece un aviso
+// breve bajo la barra con el título de la versión y «Revísalo», que abre el
+// historial. Se cierra solo al tocarlo; no vuelve hasta la siguiente versión.
+// La primera visita de un navegador no avisa (no hay «antes» con qué comparar).
+const CLAVE_VERSION_VISTA = 'escalera.version.vista'
+function leerTexto(clave: string): string | null {
+  try { return localStorage.getItem(clave) } catch { return null }
+}
+function guardarTexto(clave: string, v: string) {
+  try { localStorage.setItem(clave, v) } catch { /* sin almacenamiento */ }
+}
+
+export function AvisoVersionNueva({ onRevisar }: { onRevisar: () => void }) {
+  const [visible, setVisible] = useState(() => {
+    const vista = leerTexto(CLAVE_VERSION_VISTA)
+    if (vista === null) { guardarTexto(CLAVE_VERSION_VISTA, VERSION_APP); return false }
+    return vista !== VERSION_APP
+  })
+  if (!visible) return null
+  const v = HISTORIAL_VERSIONES.find(h => h.version === VERSION_APP)
+  const cerrar = () => { guardarTexto(CLAVE_VERSION_VISTA, VERSION_APP); setVisible(false) }
+  return (
+    <div role="status" className="aviso-version" style={{
+      position: 'fixed', top: '52px', right: '16px', zIndex: 60, maxWidth: 'min(380px, calc(100vw - 32px))',
+      display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px',
+      background: 'var(--color-panel)', border: '1px solid var(--color-blue)', borderRadius: 'var(--radius)',
+      boxShadow: '0 8px 24px rgba(0,0,0,.28)', color: 'var(--color-paper)', fontSize: '12.5px', lineHeight: 1.45,
+    }}>
+      <Sparkles size={16} color="var(--color-blue)" aria-hidden style={{ flexShrink: 0, marginTop: '1px' }} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <b>Se actualizó a la versión {VERSION_APP}</b>
+        {v && <span style={{ display: 'block', color: 'var(--color-paper-dim)' }}>{v.titulo}.</span>}
+        <span style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+          <button type="button" onClick={() => { cerrar(); onRevisar() }} style={{
+            background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: 'var(--radius)',
+            padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+          }}>Revísalo</button>
+          <button type="button" onClick={cerrar} style={{
+            background: 'transparent', border: 'none', color: 'var(--color-paper-dim)', fontSize: '12px', cursor: 'pointer', padding: '5px 2px',
+          }}>Ahora no</button>
+        </span>
+      </span>
+      <button type="button" onClick={cerrar} aria-label="Cerrar el aviso de versión nueva" style={{
+        background: 'transparent', border: 'none', color: 'var(--color-paper-faint)', cursor: 'pointer', padding: 0, lineHeight: 0,
+      }}><X size={14} /></button>
+    </div>
   )
 }
 

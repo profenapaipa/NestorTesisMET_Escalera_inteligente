@@ -13,7 +13,7 @@ import { Panel, SectionTitle, Collapsible, LogPanel, SignalGlyph } from '../../u
 import BotonesMarcadorEeg from '../BotonesMarcadorEeg'
 import { sectionLabel, sessionBtn, countdownSemaforo } from '../../ui/styles'
 import SimBoard from './SimBoard'
-import { AnimacionRegla } from './RulesAnimation'
+import AvisoRegla from './AvisoRegla'
 import GrafoEstados from './GrafoEstados'
 import Workbench from './Workbench'
 import EndBanner from './EndBanner'
@@ -317,6 +317,13 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
           <EndBanner kind="bloqueo" title="Camino sin retorno: bloqueado"
             detail="La única jugada que queda es volver a la posición anterior, y la Regla 2 no lo permite. Mira en el grafo dónde te metiste e inicia otro intento." />
         )}
+        {/* Arriba de los cubos: la regla rota en una línea (o la indicación de la vista). Ocupa un
+            espacio fijo, así el tablero y la mediación no se mueven cuando aparece. */}
+        <AvisoRegla fallo={fallo && session === 'jugando' ? fallo : null}
+          tonoIndicacion={message?.tone === 'error' ? 'error' : message?.tone === 'ok' ? 'ok' : 'info'}
+          indicacion={session === 'inactivo' ? 'Toca «Iniciar intento» para empezar.'
+            : session === 'victoria' || session === 'bloqueado' ? undefined
+              : message?.text ?? 'Toca una ficha y luego la casilla a donde quieres llevarla.'} />
         <SimBoard permitir3d
           board={board} prev={prevBoard} disabled={session !== 'jugando'}
           selected={selected} onSelect={i => { setSelected(i); setErrorCell(null) }}
@@ -325,39 +332,8 @@ function PracticaLibre({ pares, operatorId, participante }: { pares: number; ope
             : session === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${intentoRef.current}` }
               : countdown !== null && (session === 'cuenta' || (session === 'jugando' && countdown === 0)) ? { n: efectoCuenta(countdown), clave: `c${intentoRef.current}-${countdown}` }
                 : null} />
-        {/* Mediación dentro del tablero: la animación de la regla rota aparece debajo y ya no la empuja. */}
+        {/* Mediación dentro del tablero, justo bajo los cubos. */}
         <PanelMediacion motor={motor} onEnviar={enviarFase} variante="banda" />
-        {/* Jugada rechazada: se dice qué regla se rompió y se anima, igual que
-            en el tutorial. Antes solo aparecía una línea fina bajo el tablero. */}
-        {fallo && session === 'jugando' ? (
-          <div style={{
-            marginTop: '12px', padding: '12px 14px', borderRadius: 'var(--radius)',
-            background: 'rgba(250,77,86,0.10)', border: '2px solid var(--color-offline)',
-            display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap',
-          }}>
-            <span aria-hidden="true" style={{
-              width: '30px', height: '30px', flexShrink: 0, borderRadius: '50%', background: 'var(--color-offline)',
-              color: '#0B0F10', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 800,
-            }}>✕</span>
-            <div style={{ flex: 1, minWidth: '220px' }}>
-              <div style={{ ...sectionLabel, color: 'var(--color-offline)' }}>Movimiento no permitido</div>
-              <div style={{ fontSize: '17px', fontWeight: 700, margin: '2px 0' }}>{fallo.titulo}</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-paper-dim)', lineHeight: 1.5 }}>{fallo.texto}</div>
-            </div>
-            <div style={{ flex: '1 1 330px', minWidth: '240px', maxWidth: '430px' }}><AnimacionRegla error={fallo.error} /></div>
-          </div>
-        ) : (
-        <div style={{
-          marginTop: '12px', padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--color-bg)', fontSize: '13px',
-          borderLeft: `3px solid ${message?.tone === 'error' ? 'var(--color-offline)' : message?.tone === 'ok' ? 'var(--color-online)' : 'var(--color-blue)'}`,
-          color: message?.tone === 'error' ? 'var(--color-paper)' : 'var(--color-paper-dim)',
-        }}>
-          {session === 'inactivo' ? 'Toca «Iniciar intento» para empezar.'
-            : session === 'victoria' ? `¡Intercambio completo en ${moves} movimientos! Puedes iniciar otro intento.`
-              : session === 'bloqueado' ? 'No queda ninguna jugada permitida (solo volver a la posición anterior, y eso no se puede) y no se completó el cambio. Inicia otro intento.'
-                : message?.text ?? 'Toca una ficha y luego la casilla a donde quieres llevarla.'}
-        </div>
-        )}
       </Panel>
 
       {lastActivation && (

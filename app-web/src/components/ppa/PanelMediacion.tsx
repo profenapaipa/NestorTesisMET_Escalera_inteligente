@@ -96,8 +96,24 @@ export default function PanelMediacion({ motor, onEnviar, destinoConfirmacion, c
     </div>
   )
 
+  // En la franja, los mismos tres anillos con aspecto de botón tenue.
+  const anillosBoton = banda && (
+    <div className="mediacion-anillos" role="group" aria-label="Enviar una fase PPA" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <PpaChargeMeter boton size={40} value={motor.fallasSeguidas} max={CONFIG_PPA.fallasParaPausar} colorHex={PPA_HEX.pausar}
+        label={<>Pausar<br /><span style={{ color: 'var(--color-paper-faint)' }}>fallas seguidas</span></>} lleno={lleno('pausar')}
+        onClick={() => onEnviar('pausar')} titulo={titulo('pausar')} />
+      <PpaChargeMeter boton size={40} value={motor.pensarCargado ? 1 : 0} max={1} texto={motor.pensarCargado ? '✓' : '·'} colorHex={PPA_HEX.pensar}
+        label={<>Pensar<br /><span style={{ color: 'var(--color-paper-faint)' }}>tras Pausar</span></>} lleno={lleno('pensar')}
+        onClick={() => onEnviar('pensar')} titulo={titulo('pensar')} />
+      <PpaChargeMeter boton size={40} value={cargaActuar(motor.msSinMover, motor.umbralS)} max={1}
+        texto={`${Math.min(segSinMover, motor.umbralS)}/${motor.umbralS}s`} colorHex={PPA_HEX.actuar}
+        label={<>Actuar<br /><span style={{ color: 'var(--color-paper-faint)' }}>tiempo sin mover</span></>} lleno={lleno('actuar')}
+        onClick={() => onEnviar('actuar')} titulo={titulo('actuar')} />
+    </div>
+  )
+
   const ayuda = (
-    <div style={{ minHeight: '18px', marginTop: banda ? 0 : '8px', fontSize: '11px', color: 'var(--color-paper-faint)', flex: banda ? '1 1 260px' : undefined }}>
+    <div style={{ minHeight: '18px', marginTop: banda ? 0 : '8px', fontSize: '11px', color: 'var(--color-paper-faint)', flex: banda ? '0 1 auto' : undefined }}>
       {s ? (
         <>
           <span style={{ color: PPA_HEX[s.fase] }}>{PPA_LABEL[s.fase]}</span>: {s.motivo}. Toca el anillo para enviarla
@@ -117,10 +133,11 @@ export default function PanelMediacion({ motor, onEnviar, destinoConfirmacion, c
       className="mediacion-reposo"
       style={{
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '2px 8px',
-        width: banda ? undefined : '100%', minHeight: '44px', marginTop: banda ? 0 : '10px', marginLeft: banda ? 'auto' : undefined,
-        padding: '8px 12px', borderRadius: 'var(--radius)', cursor: 'pointer',
-        background: 'var(--color-panel)', border: '1px solid var(--color-line-strong)', color: 'var(--color-paper)',
-        fontSize: '13px', fontWeight: 700, opacity: cubos.seleccionado === null ? 0.6 : 1,
+        width: banda ? undefined : '100%', minHeight: '44px', marginTop: banda ? 0 : '10px',
+        padding: '8px 14px', borderRadius: banda ? '14px' : 'var(--radius)', cursor: 'pointer',
+        background: banda ? 'color-mix(in srgb, var(--color-paper) 5%, transparent)' : 'var(--color-panel)',
+        border: '1px solid var(--color-line-strong)', color: 'var(--color-paper)',
+        fontSize: banda ? '12.5px' : '13px', fontWeight: banda ? 600 : 700, opacity: cubos.seleccionado === null ? 0.6 : 1,
       }}>
       <svg width="20" height="16" viewBox="0 0 32 22" fill="none" aria-hidden="true">
         <circle cx="16" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
@@ -144,17 +161,21 @@ export default function PanelMediacion({ motor, onEnviar, destinoConfirmacion, c
   )
 
   if (banda) {
+    // Centrada bajo los cubos (2026-11-25): arriba los botones (las tres fases
+    // como botones tenues de su color y «Volver a estado inicial» neutro, al
+    // lado); abajo, en letra pequeña, el cubo seleccionado, la ayuda y el umbral.
     return (
       <section className="panel-mediacion mediacion-banda" aria-label={cubos ? 'Mediación y control de cubos' : 'Mediación'} style={{
         marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--color-line)',
-        display: 'flex', flexDirection: 'column', gap: '8px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px 18px', flexWrap: 'wrap' }}>
-          {estadoCubo}
-          {anillos}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {anillosBoton}
+          {estadoInicial && <span aria-hidden="true" className="mediacion-separador" style={{ width: '1px', alignSelf: 'stretch', background: 'var(--color-line)', margin: '4px 4px' }} />}
           {estadoInicial}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px 16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px 16px', flexWrap: 'wrap', textAlign: 'center' }}>
+          {estadoCubo}
           {ayuda}
           {/* El umbral se ajusta poco: queda plegado para no competir con los anillos. */}
           <details className="mediacion-umbral" style={{ fontSize: '11px', color: 'var(--color-paper-dim)' }}>

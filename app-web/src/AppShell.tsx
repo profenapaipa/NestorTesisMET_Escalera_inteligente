@@ -5,7 +5,7 @@ import InformeGeneral from './components/informe/InformeGeneral'
 import { BotonTerminarSesion } from './components/informe/botones'
 import MenuPerfil from './components/MenuPerfil'
 import Creditos from './components/Creditos'
-import { DistintivoVersion, GuiaVista, Limitaciones } from './components/ayuda/Ayuda'
+import { AvisoVersionNueva, DistintivoVersion, GuiaVista, Limitaciones } from './components/ayuda/Ayuda'
 import { SesionProvider, useSesion } from './core/session/sesion'
 import { sembrarSesionesDeEjemplo } from './core/session/semilla'
 import TutorialTab from './components/TutorialTab'
@@ -148,6 +148,7 @@ function Shell() {
 
       {creditos && <Creditos onCerrar={() => setCreditos(false)} />}
       {limitaciones && <Limitaciones onCerrar={() => setLimitaciones(false)} />}
+      <AvisoVersionNueva onRevisar={() => setLimitaciones(true)} />
 
       {informeAbierto && (
         <InformeGeneral

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   type Board, createInitialBoard, computeWinBoard, boardsEqual, isStuck, applyMove,
 } from '../../core/simulation/laEscaleraRules'
+import AvisoRegla, { type FalloRegla } from './AvisoRegla'
 import { classifyAttempt, explainError } from '../../core/simulation/tutor'
 import {
   AUTO_OFF_MS, EFECTOS, type PPAPhase,
@@ -35,7 +36,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
   const [status, setStatus] = useState<'jugando' | 'victoria' | 'bloqueado'>('jugando')
   const [moves, setMoves] = useState(0)
   const [errorCell, setErrorCell] = useState<number | null>(null)
-  const [lastError, setLastError] = useState<string | null>(null)
+  const [lastError, setLastError] = useState<FalloRegla | null>(null)
   const [cubeActions, setCubeActions] = useState<Record<number, PPAPhase>>({})
   const [activeAction, setActiveAction] = useState<PPAPhase | null>(null)
   const [noSelWarning, setNoSelWarning] = useState(false)
@@ -120,7 +121,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
     const { titulo, texto } = explainError(res.error, board[from]!.team)
     playError()
     setErrorCell(to)
-    setLastError(`${titulo}. ${texto}`)
+    setLastError({ error: res.error, titulo, texto })
     motor.registrarFalla(board[from]?.id)
   }
 
@@ -176,6 +177,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
         </SectionTitle>
         {status === 'victoria' && <EndBanner kind="victoria" title="¡Victoria!" detail={`Intercambio completo en ${moves} movimientos. Usa «Reiniciar tablero» para empezar de nuevo.`} />}
         {status === 'bloqueado' && <EndBanner kind="bloqueo" title="Camino sin retorno: bloqueado" detail="La única jugada que queda es volver a la posición anterior, y eso no se permite. Usa «Reiniciar tablero»." />}
+        <AvisoRegla fallo={status === 'jugando' ? lastError : null} reservar={status === 'jugando'} />
         <SimBoard permitir3d
           board={board} prev={prevBoard} disabled={status !== 'jugando'}
           selected={selectedPos} onSelect={i => { setSelectedPos(i); setErrorCell(null) }}
@@ -183,7 +185,7 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
           onMove={handleMove} onInvalid={handleInvalid}
           errorCell={errorCell} cubeActions={cubeActions}
           efectoSesion={status === 'victoria' ? { n: EFECTOS.VICTORIA, clave: `v${moves}` } : status === 'bloqueado' ? { n: EFECTOS.BLOQUEO, clave: `b${moves}` } : null} />
-        {/* Mediación y control de cubos dentro del tablero (los avisos van debajo). */}
+        {/* Mediación y control de cubos dentro del tablero, bajo los cubos (el aviso de regla va arriba). */}
         <PanelMediacion
           variante="banda"
           motor={motor}
@@ -198,16 +200,6 @@ function ControlSimulado({ pares, operatorId }: { pares: number; operatorId: str
             autoOffS: AUTO_OFF_MS / 1000,
           }}
         />
-        {(lastError || status !== 'jugando') && (
-          <div style={{
-            marginTop: '12px', padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--color-bg)', fontSize: '13px',
-            borderLeft: `3px solid ${status === 'victoria' ? 'var(--color-online)' : 'var(--color-offline)'}`,
-          }}>
-            {status === 'victoria' ? `¡Intercambio completo en ${moves} movimientos!`
-              : status === 'bloqueado' ? 'Bloqueado — no queda ninguna jugada permitida (solo volver a la posición anterior).'
-                : `Movimiento no permitido: ${lastError}`}
-          </div>
-        )}
       </Panel>
 
 
