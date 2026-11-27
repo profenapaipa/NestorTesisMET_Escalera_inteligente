@@ -2,7 +2,7 @@
 
 Herramienta híbrida físico-virtual del juego **La Escalera** (salto de la rana): un tablero de cubos inteligentes (ESP32) y una aplicación web. Las dos comparten el mismo motor de reglas, el grafo del espacio del problema en vivo, las métricas de trayectoria y un protocolo de mediación Pausar–Pensar–Actuar bajo control Mago de Oz.
 
-**Versión actual: 0.14.7** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
+**Versión actual: 0.14.8** (en desarrollo activo). Cómo ha evolucionado: tabla en [Historial de versiones](#historial-de-versiones); detalle en [`app-web/CHANGELOG.md`](app-web/CHANGELOG.md).
 
 **Pruébala en el navegador, sin instalar nada:** https://profenapaipa.github.io/NestorTesisMET_Escalera_inteligente/
 
@@ -50,6 +50,7 @@ El software se ha desarrollado y mejorado por etapas. Cada informe, sesión y pa
 <!-- tabla-versiones:inicio -->
 | Versión | Hito | Qué cambió |
 |---|---|---|
+| **0.14.8** | Riel vertical para las vistas de Control | Control Mago de Oz, Vista del jugador y Vista de observador pasan a un riel vertical a la izquierda, con ícono y texto: expandido en pantallas anchas, contraído a íconos en las angostas y como fila en el celular. |
 | **0.14.7** | Subsección visible en Control Mago de Oz | La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan en una subsección siempre visible bajo las pestañas, en lugar de un menú desplegable. |
 | **0.14.6** | Control Mago de Oz agrupa sus tres vistas | La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes. |
 | **0.14.5** | Avisos breves arriba y versiones sin fechas | El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza. |

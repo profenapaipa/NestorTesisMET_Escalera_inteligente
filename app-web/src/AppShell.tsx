@@ -14,6 +14,7 @@ import ObservadorTab from './components/ObservadorTab'
 import InformesTab from './components/InformesTab'
 import VistaJugador from './components/jugador/VistaJugador'
 import { StepMark, WIDE_MAX } from './ui/brand'
+import { ChevronsLeft, ChevronsRight, Eye, MonitorPlay, Wand2 } from 'lucide-react'
 
 type Tab = 'control' | 'jugador' | 'tutorial' | 'libre' | 'observador' | 'informes'
 
@@ -27,11 +28,11 @@ const TABS: { id: Tab; label: string; short: string; mode: string; modeColor: st
 ]
 
 // Pestaña «1 · Control Mago de Oz» (pedido del autor, 2026-11-27): agrupa las
-// tres vistas de una sesión con el tablero físico, en una subsección visible.
-const GRUPO_CONTROL: { id: Tab; nombre: string; detalle: string }[] = [
-  { id: 'control', nombre: 'Control Mago de Oz', detalle: 'La consola del operador' },
-  { id: 'jugador', nombre: 'Vista del jugador', detalle: 'La pantalla del participante' },
-  { id: 'observador', nombre: 'Vista de observador', detalle: 'Espejo de Control, solo lectura' },
+// tres vistas de una sesión con el tablero físico, en un riel vertical a la izquierda.
+const GRUPO_CONTROL: { id: Tab; nombre: string; detalle: string; corto: string; icono: typeof Eye }[] = [
+  { id: 'control', nombre: 'Control Mago de Oz', detalle: 'La consola del operador', corto: 'Control', icono: Wand2 },
+  { id: 'jugador', nombre: 'Vista del jugador', detalle: 'La pantalla del participante', corto: 'Jugador', icono: MonitorPlay },
+  { id: 'observador', nombre: 'Vista de observador', detalle: 'Espejo de Control, solo lectura', corto: 'Observador', icono: Eye },
 ]
 const EN_GRUPO = new Set<Tab>(GRUPO_CONTROL.map(g => g.id))
 // Pestañas de primer nivel: el grupo y las demás vistas.
@@ -60,6 +61,13 @@ function Shell() {
   const noop = () => { /* el perfil se fija al abrir la sesión */ }
 
   const current = TABS.find(t => t.id === tab)!
+  // Riel de las vistas de Control: expandido por defecto solo si sobra ancho
+  // (la página de Control mide 1400 px); la preferencia queda en el navegador.
+  const [rielAbierto, setRielAbierto] = useState<boolean>(() => {
+    try { const v = localStorage.getItem('escalera.riel.control'); if (v !== null) return v === '1' } catch { /* sin almacenamiento */ }
+    return window.innerWidth >= 1600
+  })
+  const cambiarRiel = (v: boolean) => { setRielAbierto(v); try { localStorage.setItem('escalera.riel.control', v ? '1' : '0') } catch { /* sin almacenamiento */ } }
   // Última subvista usada del grupo Control: al volver a la pestaña se abre ahí.
   const ultimaSub = useRef<Tab>('control')
   useEffect(() => { if (EN_GRUPO.has(tab)) ultimaSub.current = tab }, [tab])
@@ -140,36 +148,57 @@ function Shell() {
         </div>
       </div>
 
-      {/* Subsección del grupo «1 · Control Mago de Oz» (pedido del autor,
-          2026-11-27): siempre a la vista mientras se está en el grupo, sin menú
-          que la oculte. Las tres vistas de una sesión con el tablero físico. */}
+      {/* Cuerpo: riel vertical del grupo «1 · Control Mago de Oz» (pedido del
+          autor, 2026-11-27) a la izquierda y la vista a la derecha. El riel no
+          ocupa una franja fija arriba: en pantallas anchas va expandido (ícono y
+          texto) en el margen libre; en las angostas, contraído a íconos; en el
+          celular, una fila de íconos arriba. */}
+      <div className="cuerpo-shell" style={{ display: 'flex', flex: 1, minHeight: 0 }}>
       {EN_GRUPO.has(tab) && (
-        <div className="subnav-control" style={{ flexShrink: 0, borderBottom: '1px solid var(--color-line)', background: 'var(--color-panel)' }}>
-          <nav aria-label="Vistas de Control Mago de Oz" style={{
-            maxWidth: '1400px', margin: '0 auto', padding: '8px 20px', boxSizing: 'border-box',
-            display: 'flex', gap: '8px', alignItems: 'stretch', overflowX: 'auto',
-          }}>
-            {GRUPO_CONTROL.map(g => {
-              const activo = g.id === tab
-              return (
-                <button key={g.id} type="button" aria-current={activo ? 'page' : undefined} onClick={() => setTab(g.id)}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '1px',
-                    minHeight: '44px', padding: '6px 14px', borderRadius: 'var(--radius)', cursor: 'pointer', textAlign: 'left',
-                    flexShrink: 0,
-                    background: activo ? 'color-mix(in srgb, var(--color-blue) 16%, transparent)' : 'transparent',
-                    border: `1px solid ${activo ? 'var(--color-blue)' : 'var(--color-line-strong)'}`,
-                    color: activo ? 'var(--color-paper)' : 'var(--color-paper-dim)',
-                  }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700 }}>{g.nombre}</span>
-                  <span style={{ fontSize: '11px', color: activo ? 'var(--color-paper-dim)' : 'var(--color-paper-faint)' }}>{g.detalle}</span>
-                </button>
-              )
-            })}
-          </nav>
-        </div>
+        <nav aria-label="Vistas de Control Mago de Oz" className={`riel-control${rielAbierto ? ' riel-control--abierto' : ''}`} style={{
+          flexShrink: 0, width: rielAbierto ? '196px' : '60px', transition: 'width .18s ease',
+          display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 8px',
+          background: 'var(--color-panel)', borderRight: '1px solid var(--color-line)', overflowY: 'auto', boxSizing: 'border-box',
+        }}>
+          {GRUPO_CONTROL.map(g => {
+            const activo = g.id === tab
+            const Icono = g.icono
+            return (
+              <button key={g.id} type="button" aria-current={activo ? 'page' : undefined} aria-label={g.nombre}
+                title={rielAbierto ? undefined : `${g.nombre}: ${g.detalle}`} onClick={() => setTab(g.id)}
+                className="riel-control__boton"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', minHeight: '48px', padding: '8px 10px',
+                  borderRadius: 'var(--radius)', cursor: 'pointer', textAlign: 'left', width: '100%', boxSizing: 'border-box',
+                  background: activo ? 'color-mix(in srgb, var(--color-blue) 16%, transparent)' : 'transparent',
+                  border: '1px solid transparent', borderLeft: `3px solid ${activo ? 'var(--color-blue)' : 'transparent'}`,
+                  color: activo ? 'var(--color-paper)' : 'var(--color-paper-dim)',
+                }}>
+                <Icono size={20} aria-hidden style={{ flexShrink: 0, color: activo ? 'var(--color-blue)' : 'currentColor' }} />
+                {rielAbierto && (
+                  <span className="riel-control__texto" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, lineHeight: 1.25 }}>{g.nombre}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-paper-faint)', lineHeight: 1.3 }}>{g.detalle}</span>
+                  </span>
+                )}
+                {/* En el celular (fila de arriba) se ve siempre el nombre corto. */}
+                <span className="riel-control__corto" aria-hidden="true">{g.corto}</span>
+              </button>
+            )
+          })}
+          <button type="button" className="riel-control__plegar" onClick={() => cambiarRiel(!rielAbierto)}
+            aria-label={rielAbierto ? 'Contraer el panel de vistas' : 'Expandir el panel de vistas'}
+            title={rielAbierto ? 'Contraer' : 'Expandir'}
+            style={{
+              marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: rielAbierto ? 'flex-start' : 'center', gap: '8px',
+              minHeight: '40px', padding: '6px 10px', borderRadius: 'var(--radius)', cursor: 'pointer',
+              background: 'transparent', border: '1px solid var(--color-line)', color: 'var(--color-paper-faint)', fontSize: '11px',
+            }}>
+            {rielAbierto ? <><ChevronsLeft size={16} aria-hidden /> Contraer</> : <ChevronsRight size={16} aria-hidden />}
+          </button>
+        </nav>
       )}
-
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
       {/* Fase 2 de la guía: cómo usar la vista abierta (se puede cerrar). */}
       <GuiaVista key={tab} vista={tab} />
 
@@ -201,6 +230,8 @@ function Shell() {
           curso sino el archivo de todas las anteriores. */}
       <div style={{ display: tab === 'informes' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <InformesTab activo={tab === 'informes'} />
+      </div>
+      </div>
       </div>
 
       {creditos && <Creditos onCerrar={() => setCreditos(false)} />}

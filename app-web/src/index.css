@@ -310,3 +310,17 @@ html, body { max-width: 100%; overflow-x: hidden; }
 @media (max-width: 520px) {
   .panel-mediacion input[type="range"] { width: 100% !important; }
 }
+
+/* Riel de las vistas de Control Mago de Oz (2026-11-27). */
+.riel-control__corto { display: none; }
+.riel-control__boton:hover { background: color-mix(in srgb, var(--color-paper) 7%, transparent) !important; }
+.riel-control__boton:focus-visible, .riel-control__plegar:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .cuerpo-shell { flex-direction: column; }
+  .riel-control { width: auto !important; flex-direction: row !important; overflow-x: auto; overflow-y: hidden !important;
+    border-right: none !important; border-bottom: 1px solid var(--color-line); padding: 6px 8px !important; }
+  .riel-control__boton { width: auto !important; flex-shrink: 0; }
+  .riel-control__texto { display: none !important; }
+  .riel-control__corto { display: inline; font-size: 12px; font-weight: 700; }
+  .riel-control__plegar { display: none !important; }
+}

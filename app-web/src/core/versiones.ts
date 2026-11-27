@@ -29,6 +29,14 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.8', publica: true,
+    titulo: 'Riel vertical para las vistas de Control',
+    cambios: 'Control Mago de Oz, Vista del jugador y Vista de observador pasan a un riel vertical a la izquierda, con ícono y texto: expandido en pantallas anchas, contraído a íconos en las angostas y como fila en el celular.',
+    detalle: [
+      m('Control Mago de Oz, Vista del jugador y Vista de observador pasan a un riel vertical a la izquierda, con ícono, nombre y descripción: expandido en pantallas de 1600 px o más, contraído a íconos en las más angostas (con un botón para expandirlo) y como fila con nombre corto en el celular. Reemplaza la franja horizontal de la 0.14.7.'),
+    ],
+  },
+  {
     version: '0.14.7', publica: true,
     titulo: 'Subsección visible en Control Mago de Oz',
     cambios: 'La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan en una subsección siempre visible bajo las pestañas, en lugar de un menú desplegable.',

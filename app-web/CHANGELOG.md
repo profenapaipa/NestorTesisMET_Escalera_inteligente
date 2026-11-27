@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, a partir de los hitos del 
 <!-- tabla-versiones:inicio -->
 | Versión | Hito | Qué cambió |
 |---|---|---|
+| **0.14.8** | Riel vertical para las vistas de Control | Control Mago de Oz, Vista del jugador y Vista de observador pasan a un riel vertical a la izquierda, con ícono y texto: expandido en pantallas anchas, contraído a íconos en las angostas y como fila en el celular. |
 | **0.14.7** | Subsección visible en Control Mago de Oz | La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan en una subsección siempre visible bajo las pestañas, en lugar de un menú desplegable. |
 | **0.14.6** | Control Mago de Oz agrupa sus tres vistas | La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes. |
 | **0.14.5** | Avisos breves arriba y versiones sin fechas | El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza. |
@@ -45,6 +46,10 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, a partir de los hitos del 
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.8 · riel vertical para las vistas de control
+
+- **Riel vertical:** Control Mago de Oz, Vista del jugador y Vista de observador quedan en un riel a la izquierda con ícono, nombre y descripción. Va expandido si la pantalla mide 1600 px o más (ocupa el margen libre) y contraído a íconos en las más angostas; se expande o contrae con un botón y la preferencia queda en el navegador. En el celular es una fila de íconos con nombre corto. Reemplaza la franja horizontal de la 0.14.7.
 
 ## 0.14.7 · subsección visible en control mago de oz
 
