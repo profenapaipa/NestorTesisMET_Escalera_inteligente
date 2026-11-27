@@ -17,6 +17,7 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, a partir de los hitos del 
 <!-- tabla-versiones:inicio -->
 | Versión | Hito | Qué cambió |
 |---|---|---|
+| **0.14.7** | Subsección visible en Control Mago de Oz | La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan en una subsección siempre visible bajo las pestañas, en lugar de un menú desplegable. |
 | **0.14.6** | Control Mago de Oz agrupa sus tres vistas | La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes. |
 | **0.14.5** | Avisos breves arriba y versiones sin fechas | El aviso de una jugada no permitida es una línea sobre los cubos (también en la Vista de observador), la mediación queda centrada con botones tenues, el historial de versiones ya no lleva fechas y la aplicación avisa cuando se actualiza. |
 | **0.14.4** | Cuenta regresiva semáforo y mediación en el tablero | La cuenta regresiva es un semáforo en los cubos y en la pantalla (3 y 2 rojo, 1 ámbar, ¡Inicia! verde) y los controles de mediación quedan dentro del tablero, a la vista aunque aparezca el aviso de una jugada inválida. |
@@ -44,6 +45,10 @@ Las versiones de 0.1.0 a 0.8.0 se asignaron después, a partir de los hitos del 
 \* Versión interna, desarrollada en el repositorio privado de la tesis antes de que empezara el historial público (numerada a partir de los hitos de su historial de commits). El historial público empieza en la **0.11.0**.
 <!-- tabla-versiones:fin -->
 
+
+## 0.14.7 · subsección visible en control mago de oz
+
+- **Subsección visible:** la pestaña dice completo «1 · Control Mago de Oz»; al entrar, Control, Vista del jugador y Vista de observador quedan como botones grandes bajo las pestañas, siempre a la vista (antes estaban en un menú desplegable). Al volver a la pestaña se abre la última de las tres que se usó.
 
 ## 0.14.6 · control mago de oz agrupa sus tres vistas
 

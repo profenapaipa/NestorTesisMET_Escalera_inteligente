@@ -29,6 +29,14 @@ const c = (texto: string): Cambio => ({ tipo: 'correccion', texto })
 
 export const HISTORIAL_VERSIONES: Version[] = [
   {
+    version: '0.14.7', publica: true,
+    titulo: 'Subsección visible en Control Mago de Oz',
+    cambios: 'La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan en una subsección siempre visible bajo las pestañas, en lugar de un menú desplegable.',
+    detalle: [
+      m('La pestaña dice completo «1 · Control Mago de Oz» y, al entrar, Control, Vista del jugador y Vista de observador quedan como botones grandes en una subsección siempre visible, en lugar de un menú desplegable. Al volver a la pestaña se abre la última de las tres que se usó.'),
+    ],
+  },
+  {
     version: '0.14.6', publica: true,
     titulo: 'Control Mago de Oz agrupa sus tres vistas',
     cambios: 'La pestaña «1 · Control Mago de Oz» despliega Control, Vista del jugador y Vista de observador; las demás pestañas quedan como 2 · Tutorial, 3 · Simulación y 4 · Informes.',
